@@ -108,11 +108,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
-  int streak = 3; // dummy streak value
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+  int streak = 3; 
   int workoutsToday = 1;
   int caloriesToday = 1200;
   int notesToday = 2;
+
+  final List<int> weeklyWorkouts = [1, 2, 1, 3, 2, 1, 1]; // dummy data
+  final List<String> days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
   final List<String> quotes = [
     "Push yourself, because no one else is going to do it for you.",
@@ -126,6 +129,35 @@ class _HomeScreenState extends State<HomeScreen> {
     return quotes[random.nextInt(quotes.length)];
   }
 
+  late AnimationController _controller;
+  late Animation<double> _streakAnim;
+  late Animation<double> _workoutAnim;
+  late Animation<double> _calorieAnim;
+  late Animation<double> _notesAnim;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _controller = AnimationController(
+      vsync: this,
+      duration: Duration(seconds: 1),
+    );
+
+    _streakAnim = Tween<double>(begin: 0, end: streak.toDouble()).animate(_controller);
+    _workoutAnim = Tween<double>(begin: 0, end: workoutsToday.toDouble()).animate(_controller);
+    _calorieAnim = Tween<double>(begin: 0, end: caloriesToday.toDouble()).animate(_controller);
+    _notesAnim = Tween<double>(begin: 0, end: notesToday.toDouble()).animate(_controller);
+
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return SingleChildScrollView(
@@ -133,112 +165,184 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 🔥 Streak Counter
-          Card(
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(20),
-            ),
-            elevation: 4,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text("🔥 Streak",
-                          style: Theme.of(context).textTheme.titleLarge),
-                      SizedBox(height: 8),
-                      Text("$streak days in a row",
-                          style: Theme.of(context).textTheme.headlineSmall),
-                    ],
-                  ),
-                  Icon(Icons.local_fire_department,
-                      size: 50, color: Colors.deepOrange),
-                ],
-              ),
-            ),
+          // 🔥 Streak Card
+          AnimatedBuilder(
+            animation: _controller,
+            builder: (context, _) {
+              return Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(colors: [Colors.orangeAccent, Colors.deepOrange]),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [BoxShadow(color: Colors.deepOrange.withOpacity(0.3), blurRadius: 10, offset: Offset(0, 5))],
+                ),
+                padding: EdgeInsets.all(20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text("🔥 Streak", style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.white)),
+                        SizedBox(height: 8),
+                        Text("${_streakAnim.value.toInt()} days in a row", style: Theme.of(context).textTheme.headlineSmall?.copyWith(color: Colors.white, fontWeight: FontWeight.bold)),
+                      ],
+                    ),
+                    Container(
+                      decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white24),
+                      padding: EdgeInsets.all(12),
+                      child: Icon(Icons.local_fire_department, size: 50, color: Colors.white),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           SizedBox(height: 20),
 
           // 📊 Quick Stats
-          Text("Quick Stats",
-              style: Theme.of(context).textTheme.titleLarge),
+          Text("Quick Stats", style: Theme.of(context).textTheme.titleLarge),
           SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceEvenly,
             children: [
-              _buildStatCard("Workouts", workoutsToday.toString(), Icons.fitness_center),
-              _buildStatCard("Calories", caloriesToday.toString(), Icons.restaurant),
-              _buildStatCard("Notes", notesToday.toString(), Icons.notes),
+              _buildStatCard("Workouts", _workoutAnim, Icons.fitness_center, Colors.purple),
+              _buildStatCard("Calories", _calorieAnim, Icons.restaurant, Colors.green),
+              _buildStatCard("Notes", _notesAnim, Icons.notes, Colors.orange),
             ],
           ),
           SizedBox(height: 20),
 
-          // 💡 Motivational Quote
-          Card(
-            shape: RoundedRectangleBorder(
+          // 💡 Motivational Quote Card
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.deepPurple.shade100,
               borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.deepPurple.withOpacity(0.2), blurRadius: 8, offset: Offset(0, 4))],
             ),
-            color: Colors.deepPurple.shade100,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text(
-                "\"$randomQuote\"",
-                style: Theme.of(context)
-                    .textTheme
-                    .titleMedium
-                    ?.copyWith(fontStyle: FontStyle.italic),
-              ),
+            padding: EdgeInsets.all(20),
+            child: Text(
+              "\"$randomQuote\"",
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontStyle: FontStyle.italic),
             ),
           ),
           SizedBox(height: 20),
 
           // 🎯 Today’s Overview
-          Text("Today’s Overview",
-              style: Theme.of(context).textTheme.titleLarge),
+          Text("Today’s Overview", style: Theme.of(context).textTheme.titleLarge),
           SizedBox(height: 10),
-          Column(
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              ListTile(
-                leading: Icon(Icons.fitness_center, color: Colors.blue),
-                title: Text("Workouts Completed"),
-                trailing: Text("$workoutsToday"),
-              ),
-              ListTile(
-                leading: Icon(Icons.restaurant, color: Colors.green),
-                title: Text("Calories Consumed"),
-                trailing: Text("$caloriesToday kcal"),
-              ),
-              ListTile(
-                leading: Icon(Icons.notes, color: Colors.orange),
-                title: Text("Notes Logged"),
-                trailing: Text("$notesToday"),
-              ),
+              _overviewCard("Workouts Completed", workoutsToday.toString(), Icons.fitness_center, Colors.blue),
+              _overviewCard("Calories Consumed", "$caloriesToday kcal", Icons.restaurant, Colors.green),
+              _overviewCard("Notes Logged", notesToday.toString(), Icons.notes, Colors.orange),
             ],
           ),
+
+          SizedBox(height: 30),
+
+          // 📈 Weekly Progress Chart
+          Text("Weekly Progress", style: Theme.of(context).textTheme.titleLarge),
+          SizedBox(height: 10),
+          Container(
+            height: 200,
+            padding: EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [BoxShadow(color: Colors.black12, blurRadius: 8, offset: Offset(0, 5))],
+            ),
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(show: true, drawVerticalLine: false, horizontalInterval: 1),
+                titlesData: FlTitlesData(
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        int index = value.toInt();
+                        if (index < 0 || index >= days.length) return Container();
+                        return Text(days[index], style: TextStyle(fontWeight: FontWeight.bold));
+                      },
+                      interval: 1,
+                    ),
+                  ),
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(showTitles: true, interval: 1),
+                  ),
+                ),
+                borderData: FlBorderData(show: true),
+                minX: 0,
+                maxX: 6,
+                minY: 0,
+                maxY: 5,
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: List.generate(
+                      weeklyWorkouts.length,
+                      (index) => FlSpot(index.toDouble(), weeklyWorkouts[index].toDouble()),
+                    ),
+                    isCurved: true,
+                    barWidth: 3,
+                    color: Colors.deepPurple,
+                    dotData: FlDotData(show: true),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 30),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, IconData icon) {
-    return Card(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      elevation: 4,
+  Widget _buildStatCard(String label, Animation<double> valueAnim, IconData icon, Color color) {
+    return AnimatedBuilder(
+      animation: valueAnim,
+      builder: (context, _) {
+        return Container(
+          width: 100,
+          padding: EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(colors: [color.withOpacity(0.7), color]),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [BoxShadow(color: color.withOpacity(0.3), blurRadius: 6, offset: Offset(0, 4))],
+          ),
+          child: Column(
+            children: [
+              CircleAvatar(
+                backgroundColor: Colors.white24,
+                child: Icon(icon, color: Colors.white),
+              ),
+              SizedBox(height: 10),
+              Text(valueAnim.value.toInt().toString(),
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
+              SizedBox(height: 5),
+              Text(label, style: TextStyle(color: Colors.white70), textAlign: TextAlign.center),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _overviewCard(String label, String value, IconData icon, Color color) {
+    return Expanded(
       child: Container(
-        width: 100,
+        margin: EdgeInsets.symmetric(horizontal: 4),
         padding: EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16),
+        ),
         child: Column(
           children: [
-            Icon(icon, size: 30, color: Colors.deepPurple),
-            SizedBox(height: 10),
-            Text(value,
-                style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.bold)),
-            SizedBox(height: 5),
-            Text(label),
+            Icon(icon, color: color, size: 30),
+            SizedBox(height: 8),
+            Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            SizedBox(height: 4),
+            Text(label, textAlign: TextAlign.center),
           ],
         ),
       ),
