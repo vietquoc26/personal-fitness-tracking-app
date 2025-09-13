@@ -1,844 +1,540 @@
-// main.dart
-// Flutter single-file front-end for a personal fitness tracking app
-// Features: Dashboard, Progress, Workout list (video placeholders), Calorie counter,
-// Calendar scheduling, Notes & custom exercises. Modern, interactive UI.
-
-import 'package:flutter/material.dart';
+import 'dart:async';
 import 'dart:math';
+import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 void main() {
-  runApp(FitlyApp());
+  runApp(const FitnessApp());
 }
 
-class FitlyApp extends StatefulWidget {
-  @override
-  _FitlyAppState createState() => _FitlyAppState();
-}
-
-class _FitlyAppState extends State<FitlyApp> {
-  ThemeMode _themeMode = ThemeMode.light;
-
-  void toggleTheme() {
-    setState(() {
-      _themeMode = _themeMode == ThemeMode.light ? ThemeMode.dark : ThemeMode.light;
-    });
-  }
+class FitnessApp extends StatelessWidget {
+  const FitnessApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Fitly',
-      debugShowCheckedModeBanner: false,
-      themeMode: _themeMode,
+      title: 'Fitness Tracker',
       theme: ThemeData(
-        brightness: Brightness.light,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
-        useMaterial3: true,
+        primarySwatch: Colors.deepPurple,
+        scaffoldBackgroundColor: Colors.grey[50],
       ),
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple, brightness: Brightness.dark),
-        useMaterial3: true,
-      ),
-      home: MainShell(onToggleTheme: toggleTheme),
+      home: const MainShell(),
     );
   }
 }
 
-// --- Simple in-memory app state ---
+/// GLOBAL STATE (keeps workouts, meals, notes shared across screens)
 class AppState extends ChangeNotifier {
-  List<Workout> workouts = sampleWorkouts;
-  Map<DateTime, List<ScheduledWorkout>> calendar = {};
-  List<Note> notes = [];
-  int caloriesGoal = 2000;
-  int caloriesConsumed = 0;
-  int totalMinutesThisWeek = 0;
-  int workoutsFinished = 12;
-  int workoutsInProgress = 1;
+  final List<Workout> workouts = [];
+  final List<Meal> meals = [];
+  final List<Note> notes = [];
 
-  void addNote(Note note) {
-    notes.insert(0, note);
+  void addWorkout(Workout w) {
+    workouts.add(w);
     notifyListeners();
   }
 
-  void addCustomExercise(Workout w) {
-    workouts.insert(0, w);
+  void addMeal(Meal m) {
+    meals.add(m);
     notifyListeners();
   }
 
-  void logCalories(int cals) {
-    caloriesConsumed += cals;
-    notifyListeners();
-  }
-
-  void scheduleWorkout(DateTime day, ScheduledWorkout sw) {
-    final key = DateTime(day.year, day.month, day.day);
-    calendar.putIfAbsent(key, () => []).add(sw);
-    notifyListeners();
-  }
-
-  void markWorkoutDone() {
-    workoutsFinished += 1;
-    workoutsInProgress = max(0, workoutsInProgress - 1);
+  void addNote(Note n) {
+    notes.insert(0, n);
     notifyListeners();
   }
 }
 
-final AppState appState = AppState();
-
-// --- Models ---
-class Workout {
-  final String id;
-  final String title;
-  final String category;
-  final int durationMinutes;
-  final String thumbnail; // asset or network
-  final String videoUrl; // placeholder
-  Workout({required this.id, required this.title, required this.category, required this.durationMinutes, required this.thumbnail, required this.videoUrl});
-}
-
-class ScheduledWorkout {
-  final String workoutId;
-  final String note;
-  ScheduledWorkout({required this.workoutId, this.note = ''});
-}
-
-class Note {
-  final DateTime time;
-  final String text;
-  Note({required this.time, required this.text});
-}
-
-// --- Sample data ---
-final List<Workout> sampleWorkouts = [
-  Workout(
-    id: 'w1',
-    title: 'Full Body HIIT',
-    category: 'Cardio',
-    durationMinutes: 20,
-    thumbnail: '',
-    videoUrl: '',
-  ),
-  Workout(
-    id: 'w2',
-    title: 'Upper Body Strength',
-    category: 'Strength',
-    durationMinutes: 30,
-    thumbnail: '',
-    videoUrl: '',
-  ),
-  Workout(
-    id: 'w3',
-    title: 'Yoga Flow',
-    category: 'Mobility',
-    durationMinutes: 25,
-    thumbnail: '',
-    videoUrl: '',
-  ),
-];
-
-// --- Main Shell with Bottom Navigation ---
+/// ROOT WITH BOTTOM NAVIGATION
 class MainShell extends StatefulWidget {
-  final VoidCallback onToggleTheme;
-  MainShell({required this.onToggleTheme});
+  const MainShell({super.key});
 
   @override
-  _MainShellState createState() => _MainShellState();
+  State<MainShell> createState() => _MainShellState();
 }
 
 class _MainShellState extends State<MainShell> {
-  int _selectedIndex = 0;
-  final List<Widget> _pages = [];
+  int _index = 0;
+  final AppState appState = AppState();
+
+  late final List<Widget> _pages;
 
   @override
   void initState() {
     super.initState();
-    _pages.addAll([
-      DashboardScreen(),
-      WorkoutsScreen(),
-      CalendarScreen(),
-      NutritionScreen(),
-      NotesScreen(),
-    ]);
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    _pages = [
+      DashboardScreen(appState: appState),
+      WorkoutScreen(appState: appState),
+      NutritionScreen(appState: appState),
+      NotesScreen(appState: appState),
+      const ProfileScreen(),
+    ];
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Fitly'),
-        actions: [
-          IconButton(
-            icon: Icon(Icons.color_lens_outlined),
-            onPressed: widget.onToggleTheme,
-            tooltip: 'Toggle theme',
-          ),
-        ],
-      ),
-      body: _pages[_selectedIndex],
+      body: _pages[_index],
       bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Theme.of(context).colorScheme.primary,
-        unselectedItemColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
-        type: BottomNavigationBarType.fixed,
+        currentIndex: _index,
+        onTap: (i) => setState(() => _index = i),
+        selectedItemColor: Colors.deepPurple,
+        unselectedItemColor: Colors.grey,
         items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.dashboard), label: 'Home'),
-          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: 'Workouts'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: 'Calendar'),
-          BottomNavigationBarItem(icon: Icon(Icons.local_fire_department), label: 'Nutrition'),
-          BottomNavigationBarItem(icon: Icon(Icons.note), label: 'Notes'),
-        ],
-      ),
-      floatingActionButton: _selectedIndex == 1
-          ? FloatingActionButton.extended(
-              onPressed: () => _showAddCustomExercise(context),
-              label: Text('Add Exercise'),
-              icon: Icon(Icons.add),
-            )
-          : null,
-    );
-  }
-
-  void _showAddCustomExercise(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (_) => AddExerciseDialog(onCreate: (Workout w) {
-        appState.addCustomExercise(w);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Exercise added')));
-        setState(() {});
-      }),
-    );
-  }
-}
-
-// ---------------- Dashboard Screen ----------------
-class DashboardScreen extends StatefulWidget {
-  @override
-  _DashboardScreenState createState() => _DashboardScreenState();
-}
-
-class _DashboardScreenState extends State<DashboardScreen> {
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Good evening 👋', style: Theme.of(context).textTheme.titleMedium),
-                  SizedBox(height: 6),
-                  Text('Here\'s your progress today', style: Theme.of(context).textTheme.bodyMedium),
-                ],
-              ),
-              ElevatedButton.icon(
-                onPressed: () => _startQuickWorkout(context),
-                icon: Icon(Icons.play_arrow),
-                label: Text('Quick Start'),
-              ),
-            ],
-          ),
-          SizedBox(height: 18),
-          // Core numbers
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _StatCard(title: 'In progress', value: appState.workoutsInProgress.toString(), icon: Icons.schedule),
-              _StatCard(title: 'Finished', value: appState.workoutsFinished.toString(), icon: Icons.check_circle),
-              _StatCard(title: 'Time (wk)', value: appState.totalMinutesThisWeek.toString() + 'm', icon: Icons.timer),
-            ],
-          ),
-
-          SizedBox(height: 18),
-          // Simple progress chart
-          Text('Weekly activity', style: Theme.of(context).textTheme.titleSmall),
-          SizedBox(height: 8),
-          Container(
-            width: double.infinity,
-            height: 140,
-            padding: EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Theme.of(context).colorScheme.surfaceVariant,
-            ),
-            child: SimpleBarChart(data: List.generate(7, (i) => Random().nextInt(60) + 10)),
-          ),
-
-          SizedBox(height: 18),
-          Text('Upcoming', style: Theme.of(context).textTheme.titleSmall),
-          SizedBox(height: 8),
-          Expanded(child: UpcomingList()),
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
+          BottomNavigationBarItem(icon: Icon(Icons.fitness_center), label: "Workout"),
+          BottomNavigationBarItem(icon: Icon(Icons.restaurant), label: "Nutrition"),
+          BottomNavigationBarItem(icon: Icon(Icons.note), label: "Notes"),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
   }
-
-  void _startQuickWorkout(BuildContext context) {
-    // quick start picks the first workout
-    final w = appState.workouts.isNotEmpty ? appState.workouts.first : null;
-    if (w == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('No workouts available yet')));
-      return;
-    }
-    showDialog(
-      context: context,
-      builder: (_) => StartWorkoutDialog(workout: w, onFinish: () {
-        appState.markWorkoutDone();
-        setState(() {});
-      }),
-    );
-  }
 }
 
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  const _StatCard({required this.title, required this.value, required this.icon});
+//
+// MODELS
+//
+class Workout {
+  final String type;
+  final double distance; // km
+  final double duration; // hours
+  final int steps;
+  final DateTime date;
+
+  Workout({
+    required this.type,
+    required this.distance,
+    required this.duration,
+    required this.steps,
+    required this.date,
+  });
+}
+
+class Meal {
+  final String meal;
+  final int calories;
+  final DateTime date;
+
+  Meal({required this.meal, required this.calories, required this.date});
+}
+
+class Note {
+  final String text;
+  final DateTime date;
+
+  Note({required this.text, required this.date});
+}
+
+//
+// HOME / DASHBOARD
+//
+class DashboardScreen extends StatelessWidget {
+  final AppState appState;
+  const DashboardScreen({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
-    return Expanded(
-      child: Card(
-        elevation: 2,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 16.0, horizontal: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Icon(icon, size: 20),
-                  SizedBox(width: 8),
-                  Text(title, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
-              SizedBox(height: 8),
-              Text(value, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
+    int totalSteps = appState.workouts.fold(0, (sum, w) => sum + w.steps);
+    int consumedCalories = appState.meals.fold(0, (sum, m) => sum + m.calories);
+    String latestNote =
+        appState.notes.isNotEmpty ? appState.notes.first.text : "No notes yet";
 
-// Simple bar chart using CustomPaint
-class SimpleBarChart extends StatelessWidget {
-  final List<int> data; // 7 items
-  SimpleBarChart({required this.data});
+    final todayQuote = [
+      "Stay consistent! 💪 Even 15 minutes counts.",
+      "Discipline beats motivation. Show up!",
+      "One step at a time. Progress is progress.",
+      "Your only limit is you. Keep pushing!"
+    ][DateTime.now().day % 4];
 
-  @override
-  Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _BarChartPainter(data: data, color: Theme.of(context).colorScheme.primary),
-      child: Container(),
-    );
-  }
-}
-
-class _BarChartPainter extends CustomPainter {
-  final List<int> data;
-  final Color color;
-  _BarChartPainter({required this.data, required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = color.withOpacity(0.85);
-    final barWidth = size.width / (data.length * 2);
-    final maxVal = data.reduce(max).toDouble();
-    for (int i = 0; i < data.length; i++) {
-      final x = (i * 2 + 0.5) * barWidth;
-      final h = (data[i] / maxVal) * (size.height - 10);
-      final rect = Rect.fromLTWH(x, size.height - h, barWidth, h);
-      final rrect = RRect.fromRectAndRadius(rect, Radius.circular(6));
-      canvas.drawRRect(rrect, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class UpcomingList extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final today = DateTime.now();
-    final key = DateTime(today.year, today.month, today.day);
-    final scheduled = appState.calendar[key] ?? [];
-    if (scheduled.isEmpty) {
-      return Center(child: Text('No workout scheduled for today.'));
-    }
-    return ListView.builder(
-      itemCount: scheduled.length,
-      itemBuilder: (_, idx) {
-        final s = scheduled[idx];
-        final workout = appState.workouts.firstWhere((w) => w.id == s.workoutId, orElse: () => appState.workouts.first);
-        return ListTile(
-          leading: CircleAvatar(child: Text(workout.title[0])),
-          title: Text(workout.title),
-          subtitle: Text(s.note),
-          trailing: ElevatedButton(onPressed: () {
-            showDialog(context: context, builder: (_) => StartWorkoutDialog(workout: workout, onFinish: () { appState.markWorkoutDone(); }));
-          }, child: Text('Start')),
-        );
-      },
-    );
-  }
-}
-
-// ---------------- Workouts Screen ----------------
-class WorkoutsScreen extends StatefulWidget {
-  @override
-  _WorkoutsScreenState createState() => _WorkoutsScreenState();
-}
-
-class _WorkoutsScreenState extends State<WorkoutsScreen> {
-  String _filter = 'All';
-
-  @override
-  Widget build(BuildContext context) {
-    final categories = ['All', 'Cardio', 'Strength', 'Mobility'];
-    final list = _filter == 'All' ? appState.workouts : appState.workouts.where((w) => w.category == _filter).toList();
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        children: [
-          Row(
-            children: categories.map((c) => Padding(
-              padding: const EdgeInsets.only(right:8.0),
-              child: ChoiceChip(label: Text(c), selected: _filter==c, onSelected: (_) { setState(() { _filter = c; }); }),
-            )).toList(),
-          ),
-          SizedBox(height:12),
-          Expanded(
-            child: ListView.builder(
-              itemCount: list.length,
-              itemBuilder: (_, idx) {
-                final w = list[idx];
-                return Card(
-                  margin: EdgeInsets.only(bottom:10),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  child: ListTile(
-                    contentPadding: EdgeInsets.all(12),
-                    leading: Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8),
-                        color: Theme.of(context).colorScheme.primary.withOpacity(0.12),
-                      ),
-                      child: Icon(Icons.play_circle_fill),
-                    ),
-                    title: Text(w.title),
-                    subtitle: Text('${w.category} • ${w.durationMinutes} min'),
-                    trailing: PopupMenuButton<String>(
-                      onSelected: (s) {
-                        if (s == 'schedule') {
-                          _showSchedulePicker(context, w);
-                        } else if (s == 'start') {
-                          showDialog(context: context, builder: (_) => StartWorkoutDialog(workout: w, onFinish: () { appState.markWorkoutDone(); setState(() {}); }));
-                        }
-                      },
-                      itemBuilder: (_) => [
-                        PopupMenuItem(value: 'start', child: Text('Start')),
-                        PopupMenuItem(value: 'schedule', child: Text('Schedule')),
-                      ],
-                    ),
-                  ),
-                );
-              },
+    return SafeArea(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Greeting
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text("Good Morning 👋",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w400)),
+                    Text("Ho Viet",
+                        style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const CircleAvatar(
+                  radius: 24,
+                  backgroundImage: AssetImage("assets/profile.jpg"),
+                ),
+              ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
+            const SizedBox(height: 24),
 
-  void _showSchedulePicker(BuildContext context, Workout w) {
-    showDialog(context: context, builder: (_) => ScheduleDialog(onSchedule: (day, note){
-      appState.scheduleWorkout(day, ScheduledWorkout(workoutId: w.id, note: note));
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Scheduled on ${day.month}/${day.day}')));
-    }));
-  }
-}
+            // Steps
+            Text("Total Steps",
+                style: TextStyle(fontSize: 14, color: Colors.grey[600])),
+            Text("$totalSteps",
+                style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
 
-// ---------------- Calendar Screen ----------------
-class CalendarScreen extends StatefulWidget {
-  @override
-  _CalendarScreenState createState() => _CalendarScreenState();
-}
+            const SizedBox(height: 20),
 
-class _CalendarScreenState extends State<CalendarScreen> {
-  DateTime _focused = DateTime.now();
-
-  @override
-  Widget build(BuildContext context) {
-    final firstDay = DateTime(_focused.year, _focused.month, 1);
-    final daysInMonth = DateUtils.getDaysInMonth(_focused.year, _focused.month);
-    final startWeekday = firstDay.weekday % 7; // make Sunday=0
-
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              IconButton(icon: Icon(Icons.chevron_left), onPressed: (){ setState((){ _focused = DateTime(_focused.year, _focused.month -1, 1); });}),
-              Text('${_monthName(_focused.month)} ${_focused.year}', style: Theme.of(context).textTheme.titleMedium),
-              IconButton(icon: Icon(Icons.chevron_right), onPressed: (){ setState(()=> _focused = DateTime(_focused.year, _focused.month +1, 1));}),
-            ],
-          ),
-          SizedBox(height: 8),
-          _buildWeekdaysRow(context),
-          SizedBox(height: 8),
-          Expanded(
-            child: GridView.builder(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 7, childAspectRatio: 1.2),
-              itemCount: startWeekday + daysInMonth,
-              itemBuilder: (_, idx) {
-                if (idx < startWeekday) return Container();
-                final day = idx - startWeekday + 1;
-                final date = DateTime(_focused.year, _focused.month, day);
-                final key = DateTime(date.year, date.month, date.day);
-                final scheduled = appState.calendar[key] ?? [];
-                final isToday = DateTime.now().year == date.year && DateTime.now().month == date.month && DateTime.now().day == date.day;
-                return GestureDetector(
-                  onTap: () { _showDayDetails(context, date, scheduled); },
-                  child: Container(
-                    margin: EdgeInsets.all(4),
-                    padding: EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(8),
-                      color: isToday ? Theme.of(context).colorScheme.primary.withOpacity(0.12) : null,
+            // Nutrition Progress
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: Colors.green[50],
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text("Nutrition",
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: consumedCalories / 2000,
+                      backgroundColor: Colors.grey[200],
+                      color: Colors.green,
+                      minHeight: 10,
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(day.toString(), style: TextStyle(fontWeight: FontWeight.bold)),
-                        Spacer(),
-                        if (scheduled.isNotEmpty) Align(alignment: Alignment.bottomRight, child: Icon(Icons.fitness_center, size: 16)),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildWeekdaysRow(BuildContext context) {
-    final days = ['S','M','T','W','T','F','S'];
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: days.map((d) => Expanded(child: Center(child: Text(d)))).toList(),
-    );
-  }
-
-  String _monthName(int m) {
-    const names = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    return names[m-1];
-  }
-
-  void _showDayDetails(BuildContext context, DateTime date, List<ScheduledWorkout> scheduled) {
-    showDialog(context: context, builder: (_) => AlertDialog(
-      title: Text('Details ${date.month}/${date.day}/${date.year}'),
-      content: Container(
-        width: double.maxFinite,
-        child: scheduled.isEmpty ? Text('No scheduled workouts') : Column(
-          mainAxisSize: MainAxisSize.min,
-          children: scheduled.map((s) {
-            final w = appState.workouts.firstWhere((x) => x.id == s.workoutId, orElse: () => sampleWorkouts.first);
-            return ListTile(title: Text(w.title), subtitle: Text(s.note));
-          }).toList(),
-        ),
-      ),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: Text('Close'))],
-    ));
-  }
-}
-
-// ---------------- Nutrition Screen ----------------
-class NutritionScreen extends StatefulWidget {
-  @override
-  _NutritionScreenState createState() => _NutritionScreenState();
-}
-
-class _NutritionScreenState extends State<NutritionScreen> {
-  final _controller = TextEditingController();
-
-  @override
-  Widget build(BuildContext context) {
-    final goal = appState.caloriesGoal;
-    final consumed = appState.caloriesConsumed;
-    final remaining = max(0, goal - consumed);
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Calories', style: Theme.of(context).textTheme.titleMedium),
-          SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Goal', style: Theme.of(context).textTheme.bodySmall),
-                      SizedBox(height: 6),
-                      Text('$goal kcal', style: Theme.of(context).textTheme.headlineSmall),
-                    ],
-                  ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text('Consumed', style: Theme.of(context).textTheme.bodySmall),
-                      SizedBox(height: 6),
-                      Text('$consumed kcal', style: Theme.of(context).textTheme.headlineSmall),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: 12),
-          Text('Remaining: $remaining kcal'),
-          SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _controller,
-                  keyboardType: TextInputType.number,
-                  decoration: InputDecoration(hintText: 'Add meal calories'),
+                    const SizedBox(height: 8),
+                    Text("$consumedCalories / 2000 kcal consumed"),
+                  ],
                 ),
               ),
-              SizedBox(width: 8),
-              ElevatedButton(onPressed: _addCalories, child: Text('Log')),
-            ],
-          ),
-          SizedBox(height: 18),
-          Text('Recent meals', style: Theme.of(context).textTheme.titleSmall),
-          SizedBox(height: 8),
-          Expanded(child: _RecentMealsList()),
-        ],
+            ),
+
+            const SizedBox(height: 20),
+
+            // Latest Note
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: Colors.blue[50],
+              child: ListTile(
+                leading: const Icon(Icons.note_alt_outlined, color: Colors.blue),
+                title: Text(latestNote,
+                    maxLines: 2, overflow: TextOverflow.ellipsis),
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // Motivation
+            Card(
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              color: Colors.deepPurple[50],
+              child: ListTile(
+                leading: const Icon(Icons.lightbulb_outline, color: Colors.deepPurple),
+                title: Text(todayQuote),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
-
-  void _addCalories() {
-    final text = _controller.text.trim();
-    final n = int.tryParse(text);
-    if (n == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Please enter a valid number')));
-      return;
-    }
-    appState.logCalories(n);
-    _controller.clear();
-    setState(() {});
-  }
 }
 
-class _RecentMealsList extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    // For demo, just show last 5 calorie entries approximated by random numbers
-    final items = List.generate(5, (i) => 150 + i * 50);
-    return ListView.builder(
-      itemCount: items.length,
-      itemBuilder: (_, idx) => ListTile(title: Text('Meal ${idx+1}'), trailing: Text('${items[idx]} kcal')),
-    );
-  }
-}
-
-// ---------------- Notes Screen ----------------
-class NotesScreen extends StatefulWidget {
-  @override
-  _NotesScreenState createState() => _NotesScreenState();
-}
-
-class _NotesScreenState extends State<NotesScreen> {
-  final _noteController = TextEditingController();
+//
+// WORKOUTS
+//
+class WorkoutScreen extends StatelessWidget {
+  final AppState appState;
+  const WorkoutScreen({super.key, required this.appState});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(child: TextField(controller: _noteController, decoration: InputDecoration(hintText: 'Add a workout note...'))),
-              SizedBox(width: 8),
-              ElevatedButton(onPressed: _submitNote, child: Text('Add')),
-            ],
-          ),
-          SizedBox(height: 12),
-          Expanded(child: ListView.builder(itemCount: appState.notes.length, itemBuilder: (_, idx) {
-            final n = appState.notes[idx];
-            return Card(margin: EdgeInsets.only(bottom:8), child: ListTile(title: Text(n.text), subtitle: Text('${n.time}')));
-          })),
-        ],
+    return Scaffold(
+      appBar: AppBar(title: const Text("My Workouts")),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: appState.workouts.length,
+        itemBuilder: (context, index) {
+          final w = appState.workouts[index];
+          return Card(
+            child: ListTile(
+              leading: Icon(
+                w.type == "Run" ? Icons.directions_run : Icons.directions_bike,
+                color: Colors.deepPurple,
+              ),
+              title: Text("${w.type} - ${w.distance} km"),
+              subtitle: Text("${w.duration} h • ${w.steps} steps"),
+              trailing: Text(DateFormat("MMM d").format(w.date)),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final workout = await showDialog<Workout>(
+            context: context,
+            builder: (_) => const StartWorkoutDialog(),
+          );
+          if (workout != null) {
+            appState.addWorkout(workout);
+          }
+        },
+        backgroundColor: Colors.deepPurple,
+        child: const Icon(Icons.add),
       ),
     );
   }
-
-  void _submitNote() {
-    final t = _noteController.text.trim();
-    if (t.isEmpty) return;
-    final note = Note(time: DateTime.now(), text: t);
-    appState.addNote(note);
-    _noteController.clear();
-    setState(() {});
-  }
 }
 
-// ---------------- Dialogs & Forms ----------------
 class StartWorkoutDialog extends StatefulWidget {
-  final Workout workout;
-  final VoidCallback onFinish;
-  StartWorkoutDialog({required this.workout, required this.onFinish});
+  const StartWorkoutDialog({super.key});
 
   @override
-  _StartWorkoutDialogState createState() => _StartWorkoutDialogState();
+  State<StartWorkoutDialog> createState() => _StartWorkoutDialogState();
 }
 
 class _StartWorkoutDialogState extends State<StartWorkoutDialog> {
-  int _seconds = 0;
-  bool _running = true;
+  int seconds = 10;
+  Timer? _timer;
+
+  void _startTimer() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (seconds > 0) {
+        setState(() => seconds--);
+      } else {
+        t.cancel();
+      }
+    });
+  }
 
   @override
   void initState() {
     super.initState();
-    _seconds = widget.workout.durationMinutes * 60;
-    // for demo we do not run a real timer
+    _startTimer();
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Start ${widget.workout.title}'),
+      title: const Text("Workout Timer"),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('Duration: ${widget.workout.durationMinutes} minutes'),
-          SizedBox(height: 12),
-          LinearProgressIndicator(value: 0),
+          Text("$seconds s remaining",
+              style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 20),
+          LinearProgressIndicator(
+            value: (10 - seconds) / 10,
+            color: Colors.deepPurple,
+          ),
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-        ElevatedButton(onPressed: () {
-          Navigator.pop(context);
-          widget.onFinish();
-        }, child: Text('Finish')),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(
+              context,
+              Workout(
+                type: "Run",
+                distance: Random().nextDouble() * 5,
+                duration: Random().nextDouble() * 1.5,
+                steps: Random().nextInt(5000) + 1000,
+                date: DateTime.now(),
+              ),
+            );
+          },
+          child: const Text("Finish"),
+        ),
       ],
     );
   }
 }
 
-class ScheduleDialog extends StatefulWidget {
-  final void Function(DateTime day, String note) onSchedule;
-  ScheduleDialog({required this.onSchedule});
+//
+// NUTRITION
+//
+class NutritionScreen extends StatelessWidget {
+  final AppState appState;
+  const NutritionScreen({super.key, required this.appState});
 
   @override
-  _ScheduleDialogState createState() => _ScheduleDialogState();
+  Widget build(BuildContext context) {
+    int consumed = appState.meals.fold(0, (sum, m) => sum + m.calories);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text("Nutrition")),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            LinearProgressIndicator(
+              value: consumed / 2000,
+              color: Colors.green,
+              backgroundColor: Colors.grey[300],
+              minHeight: 12,
+            ),
+            const SizedBox(height: 8),
+            Text("$consumed / 2000 kcal consumed"),
+            const SizedBox(height: 20),
+            Expanded(
+              child: ListView(
+                children: appState.meals.map((m) {
+                  return Card(
+                    child: ListTile(
+                      title: Text(m.meal),
+                      subtitle: Text("${m.calories} kcal"),
+                      trailing: Text(DateFormat("hh:mm a").format(m.date)),
+                    ),
+                  );
+                }).toList(),
+              ),
+            )
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final meal = await showDialog<Meal>(
+            context: context,
+            builder: (_) => const AddMealDialog(),
+          );
+          if (meal != null) appState.addMeal(meal);
+        },
+        backgroundColor: Colors.green,
+        child: const Icon(Icons.add),
+      ),
+    );
+  }
 }
 
-class _ScheduleDialogState extends State<ScheduleDialog> {
-  DateTime _picked = DateTime.now();
-  final _noteController = TextEditingController();
+class AddMealDialog extends StatefulWidget {
+  const AddMealDialog({super.key});
+
+  @override
+  State<AddMealDialog> createState() => _AddMealDialogState();
+}
+
+class _AddMealDialogState extends State<AddMealDialog> {
+  final mealCtrl = TextEditingController();
+  final calCtrl = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Schedule workout'),
+      title: const Text("Add Meal"),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          TextButton.icon(onPressed: _pickDate, icon: Icon(Icons.date_range), label: Text('${_picked.month}/${_picked.day}/${_picked.year}')),
-          TextField(controller: _noteController, decoration: InputDecoration(hintText: 'Note (optional)')),
+          TextField(controller: mealCtrl, decoration: const InputDecoration(labelText: "Meal")),
+          TextField(controller: calCtrl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: "Calories")),
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-        ElevatedButton(onPressed: () {
-          widget.onSchedule(_picked, _noteController.text.trim());
-          Navigator.pop(context);
-        }, child: Text('Save')),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(
+              context,
+              Meal(meal: mealCtrl.text, calories: int.tryParse(calCtrl.text) ?? 0, date: DateTime.now()),
+            );
+          },
+          child: const Text("Save"),
+        ),
       ],
     );
   }
+}
 
-  void _pickDate() async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(context: context, initialDate: _picked, firstDate: now.subtract(Duration(days: 365)), lastDate: now.add(Duration(days: 365)));
-    if (picked != null) setState((){ _picked = picked; });
+//
+// NOTES
+//
+class NotesScreen extends StatelessWidget {
+  final AppState appState;
+  const NotesScreen({super.key, required this.appState});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text("My Notes")),
+      body: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: appState.notes.length,
+        itemBuilder: (context, index) {
+          final n = appState.notes[index];
+          return Card(
+            child: ListTile(
+              leading: const Icon(Icons.note, color: Colors.blue),
+              title: Text(n.text),
+              subtitle: Text(DateFormat("MMM d, hh:mm a").format(n.date)),
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () async {
+          final note = await showDialog<Note>(
+            context: context,
+            builder: (_) => const AddNoteDialog(),
+          );
+          if (note != null) appState.addNote(note);
+        },
+        backgroundColor: Colors.blue,
+        child: const Icon(Icons.add),
+      ),
+    );
   }
 }
 
-class AddExerciseDialog extends StatefulWidget {
-  final void Function(Workout) onCreate;
-  AddExerciseDialog({required this.onCreate});
+class AddNoteDialog extends StatefulWidget {
+  const AddNoteDialog({super.key});
 
   @override
-  _AddExerciseDialogState createState() => _AddExerciseDialogState();
+  State<AddNoteDialog> createState() => _AddNoteDialogState();
 }
 
-class _AddExerciseDialogState extends State<AddExerciseDialog> {
-  final _title = TextEditingController();
-  final _category = TextEditingController();
-  final _duration = TextEditingController();
+class _AddNoteDialogState extends State<AddNoteDialog> {
+  final ctrl = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: Text('Create custom exercise'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(controller: _title, decoration: InputDecoration(hintText: 'Title')),
-          TextField(controller: _category, decoration: InputDecoration(hintText: 'Category')),
-          TextField(controller: _duration, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Duration (min)')),
-        ],
-      ),
+      title: const Text("Add Note"),
+      content: TextField(controller: ctrl, decoration: const InputDecoration(labelText: "Note")),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: Text('Cancel')),
-        ElevatedButton(onPressed: _create, child: Text('Create')),
+        TextButton(
+          onPressed: () {
+            Navigator.pop(context, Note(text: ctrl.text, date: DateTime.now()));
+          },
+          child: const Text("Save"),
+        ),
       ],
     );
   }
-
-  void _create() {
-    final t = _title.text.trim();
-    final c = _category.text.trim().isEmpty ? 'Custom' : _category.text.trim();
-    final d = int.tryParse(_duration.text.trim()) ?? 10;
-    if (t.isEmpty) return;
-    final w = Workout(id: 'u${DateTime.now().millisecondsSinceEpoch}', title: t, category: c, durationMinutes: d, thumbnail: '', videoUrl: '');
-    widget.onCreate(w);
-    Navigator.pop(context);
-  }
 }
 
-// ---------------- End of file ----------------
+//
+// PROFILE
+//
+class ProfileScreen extends StatelessWidget {
+  const ProfileScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return const Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          CircleAvatar(radius: 50, backgroundImage: AssetImage("assets/profile.jpg")),
+          SizedBox(height: 16),
+          Text("Ho Viet", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text("Account Manager & Fitness Enthusiast"),
+        ],
+      ),
+    );
+  }
+}
