@@ -40,5 +40,5 @@ externalPort = 3000
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["flutter", "run", "-d", "web-server", "--web-hostname", "0.0.0.0", "--web-port", "5000", "--release"]
-build = ["flutter", "build", "web"]
+run = ["bash", "-c", "cd build/web && python3 -m http.server 5000 --bind 0.0.0.0"]
+build = ["flutter", "build", "web", "--release"]
