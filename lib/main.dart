@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:math';
 import 'dart:async';
-import 'dart:collection'
+import 'dart:collection';
 
 void main() {
   runApp(VitApp());
