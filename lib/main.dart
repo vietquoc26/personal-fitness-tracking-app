@@ -240,7 +240,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   Text('Good evening 👋', style: Theme.of(context).textTheme.titleMedium),
                   SizedBox(height: 6),
-                  Text('Here's your progress today', style: Theme.of(context).textTheme.bodyMedium),
+                  Text('Here\'s your progress today', style: Theme.of(context).textTheme.bodyMedium),
                 ],
               ),
               ElevatedButton.icon(
@@ -820,7 +820,7 @@ class _AddExerciseDialogState extends State<AddExerciseDialog> {
         children: [
           TextField(controller: _title, decoration: InputDecoration(hintText: 'Title')),
           TextField(controller: _category, decoration: InputDecoration(hintText: 'Category')),
-          TextField(controller: _duration, decoration: InputDecoration(hintText: 'Duration (min)', keyboardType: TextInputType.number)),
+          TextField(controller: _duration, keyboardType: TextInputType.number, decoration: InputDecoration(hintText: 'Duration (min)')),
         ],
       ),
       actions: [
