@@ -1076,4 +1076,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 }
 
+// ---------------------- Progress SCREEN ----------------------
+class ProgressScreen extends StatelessWidget {
+  const ProgressScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Text(
+          "Progress Screen Coming Soon...",
+          style: Theme.of(context).textTheme.headlineMedium,
+        ),
+      ),
+    );
+  }
+}
+
+
 
