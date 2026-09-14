@@ -107,6 +107,21 @@ main{padding-block:22px 60px; display:flex; flex-direction:column; gap:20px;}
 .panel-title{font-size:13px; letter-spacing:.08em; color:var(--text-muted); text-transform:uppercase; font-weight:600;}
 .eyebrow{font-family:var(--font-display); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent);}
 
+/* ============ WEEK STRIP ============ */
+.week-strip{display:flex; gap:10px; overflow-x:auto; padding-bottom:2px; margin:-2px -2px 0; scrollbar-width:thin;}
+.week-chip{
+  flex:0 0 auto; width:132px; text-align:left; cursor:pointer;
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius);
+  padding:11px 13px; display:flex; flex-direction:column; gap:3px;
+}
+.week-chip:hover{border-color:var(--border-strong);}
+.week-chip.is-today{border-color:var(--accent); background:var(--accent-soft);}
+.week-chip .wc-day{font-size:11.5px; font-weight:700; letter-spacing:.03em; text-transform:uppercase; color:var(--text-muted);}
+.week-chip.is-today .wc-day{color:var(--accent);}
+.week-chip .wc-focus{font-size:13.5px; font-weight:600; color:var(--text); line-height:1.3;}
+.week-chip .wc-date{font-size:11px; color:var(--text-faint); font-variant-numeric:tabular-nums;}
+.week-chip.is-done .wc-date{color:var(--good);}
+
 /* ============ DEMO BANNER ============ */
 .demo-banner{
   display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
@@ -366,6 +381,14 @@ details[open] .ref-chevron{transform:rotate(180deg);}
   <!-- HERO -->
   <section class="hero" id="hero"></section>
 
+  <!-- WEEK PREVIEW -->
+  <section class="panel">
+    <div class="panel-head">
+      <span class="panel-title" style="margin:0;">Lịch tập tuần này</span>
+    </div>
+    <div class="week-strip" id="weekStrip"></div>
+  </section>
+
   <!-- KPI -->
   <section>
     <div class="panel-title" style="margin-bottom:10px;">Tổng quan</div>
@@ -495,6 +518,11 @@ details[open] .ref-chevron{transform:rotate(180deg);}
       <button class="btn btn-primary" id="btnSaveSettings" type="button">Lưu</button>
     </div>
   </div>
+</div>
+
+<!-- DAY PREVIEW MODAL -->
+<div class="modal-overlay" id="dayPreviewOverlay" hidden>
+  <div class="modal-card" id="dayPreviewCard"></div>
 </div>
 
 <!-- TIMER OVERLAY -->
@@ -770,6 +798,79 @@ function renderWeekdayHero(el){
     }
     renderAll();
   });
+}
+
+/* ================= RENDER: WEEK PREVIEW ================= */
+function mondayOf(d){
+  var w = dowIndex(d); // 0 Sun .. 6 Sat
+  var diff = (w===0 ? -6 : 1-w);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()+diff);
+}
+function renderWeekStrip(){
+  var strip = document.getElementById("weekStrip");
+  var mon = mondayOf(today);
+  var html = "";
+  for(var i=0;i<7;i++){
+    var d = new Date(mon.getFullYear(), mon.getMonth(), mon.getDate()+i);
+    var iso = isoDate(d);
+    var isToday = iso === TODAY_ISO;
+    var key = dayKeyFor(d);
+    var sess = state.sessions[iso];
+    var done = !!(sess && sess.completed);
+    var dayLabel, focusText;
+    if(key){ dayLabel = PROGRAM[key].label; focusText = PROGRAM[key].focus; }
+    else { dayLabel = vnWeekdayLabel(d); focusText = "Nghỉ / vận động nhẹ"; }
+    html += '<button type="button" class="week-chip'+(isToday?' is-today':'')+(done?' is-done':'')+'" data-iso="'+iso+'">'+
+      '<span class="wc-day">'+dayLabel+(isToday?' · Hôm nay':'')+'</span>'+
+      '<span class="wc-focus">'+focusText+'</span>'+
+      '<span class="wc-date">'+shortDate(d)+(done?' · Đã tập':'')+'</span>'+
+    '</button>';
+  }
+  strip.innerHTML = html;
+  Array.prototype.forEach.call(strip.querySelectorAll(".week-chip"), function(btn){
+    btn.addEventListener("click", function(){ openDayPreview(btn.getAttribute("data-iso")); });
+  });
+}
+function closeDayPreview(){ document.getElementById("dayPreviewOverlay").hidden = true; }
+function openDayPreview(iso){
+  var d = parseISO(iso);
+  var key = dayKeyFor(d);
+  var card = document.getElementById("dayPreviewCard");
+  var isToday = iso === TODAY_ISO;
+  var dateLabel = shortDate(d)+(isToday?' · Hôm nay':'');
+  if(key){
+    var prog = PROGRAM[key];
+    var sess = state.sessions[iso];
+    var done = !!(sess && sess.completed);
+    var rows = prog.exercises.map(function(ex,i){
+      return '<li class="ex-row'+(done?' done':'')+'">'+
+        '<span class="ex-num">'+(i+1)+'</span>'+
+        '<span><span class="ex-name">'+ex.n+'</span><br><span class="ex-area">'+ex.a+'</span></span>'+
+        '<a class="ex-video" href="'+ytUrl(ex.v)+'" target="_blank" rel="noopener">'+
+          '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Video</a>'+
+      '</li>';
+    }).join("");
+    card.innerHTML =
+      '<h2>'+prog.label+' <span style="font-weight:400;color:var(--text-muted);font-size:13px;">'+dateLabel+'</span></h2>'+
+      '<div class="hero-focus" style="margin-top:0;">'+prog.focus+'</div>'+
+      '<div class="hero-muscles">'+prog.muscles+'</div>'+
+      '<ul class="ex-list">'+rows+'</ul>'+
+      (done ? '<div class="stage-note" style="margin:0; text-align:center;">✓ Đã hoàn thành ngày này</div>' : '')+
+      '<div style="display:flex; justify-content:flex-end;">'+
+        '<button class="btn btn-secondary" id="btnCloseDayPreview" type="button">Đóng</button>'+
+      '</div>';
+  } else {
+    card.innerHTML =
+      '<h2>'+vnWeekdayLabel(d)+' <span style="font-weight:400;color:var(--text-muted);font-size:13px;">'+dateLabel+'</span></h2>'+
+      '<div class="weekend-cards" style="margin-top:0;">'+
+        '<div class="wk-card"><h3>Vận động nhẹ‑vừa / nghỉ ngơi tích cực</h3><p>30–45 phút đi bộ nhanh, đạp xe nhẹ, bơi, hoặc môn thể thao bạn thích — hoặc nghỉ hẳn nếu tuần đã mệt.</p></div>'+
+      '</div>'+
+      '<div style="display:flex; justify-content:flex-end;">'+
+        '<button class="btn btn-secondary" id="btnCloseDayPreview" type="button">Đóng</button>'+
+      '</div>';
+  }
+  document.getElementById("dayPreviewOverlay").hidden = false;
+  document.getElementById("btnCloseDayPreview").addEventListener("click", closeDayPreview);
 }
 
 function renderHabitChips(container, iso){
@@ -1346,6 +1447,7 @@ document.getElementById("timerVideoRetry").addEventListener("click", function(){
 /* ================= RENDER ALL ================= */
 function renderAll(){
   renderHero();
+  renderWeekStrip();
   renderKPI();
   renderWeightChart();
   renderAdherenceChart();
