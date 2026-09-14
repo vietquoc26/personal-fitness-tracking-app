@@ -1,0 +1,1448 @@
+
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NHỊP</title>
+<meta name="description" content="Bảng điều khiển tập luyện bodyweight 15 phút/ngày — đếm giờ buổi tập, theo dõi cân nặng và độ đều đặn. Bản offline, lưu dữ liệu ngay trên trình duyệt.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Be+Vietnam+Pro:ital,wght@0,400;0,500;0,600;0,800;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;}
+img{max-width:100%;}
+[hidden]{display:none!important;}
+/* ============ TOKENS ============ */
+:root{
+  --bg:#1A1512; --surface:#241E19; --surface-2:#2E2620; --surface-3:#3A302A;
+  --border:#3D342C; --border-strong:#4E4237;
+  --text:#F2EAE1; --text-muted:#AFA093; --text-faint:#7A6C60;
+  --accent:#E8622A; --accent-soft:#3A2618; --on-accent:#1A1210;
+  --accent-2:#2FA39D; --accent-2-soft:#17302E;
+  --good:#2F9E6E; --good-soft:#16302A;
+  --warning:#B8841A; --warning-soft:#332711;
+  --critical:#D1435C; --critical-soft:#331A20;
+  --font-display:'Oswald',"Arial Narrow",sans-serif;
+  --font-body:'Be Vietnam Pro',system-ui,sans-serif;
+  --font-mono:'JetBrains Mono',ui-monospace,monospace;
+  --radius:4px; --radius-lg:10px;
+  color-scheme: dark;
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    --bg:#FBF6F0; --surface:#FFFFFF; --surface-2:#F3ECE3; --surface-3:#EAE0D2;
+    --border:#E2D6C8; --border-strong:#D2C2AC;
+    --text:#2A2118; --text-muted:#6E6053; --text-faint:#9C8E7E;
+    --accent:#C6531B; --accent-soft:#F6E3D4; --on-accent:#FFF8F2;
+    --accent-2:#00897B; --accent-2-soft:#DCEEEB;
+    --good:#00785A; --good-soft:#DCEEE6;
+    --warning:#8C5A0A; --warning-soft:#F5E6CB;
+    --critical:#B81452; --critical-soft:#F6DCE4;
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"]{
+  --bg:#FBF6F0; --surface:#FFFFFF; --surface-2:#F3ECE3; --surface-3:#EAE0D2;
+  --border:#E2D6C8; --border-strong:#D2C2AC;
+  --text:#2A2118; --text-muted:#6E6053; --text-faint:#9C8E7E;
+  --accent:#C6531B; --accent-soft:#F6E3D4; --on-accent:#FFF8F2;
+  --accent-2:#00897B; --accent-2-soft:#DCEEEB;
+  --good:#00785A; --good-soft:#DCEEE6;
+  --warning:#8C5A0A; --warning-soft:#F5E6CB;
+  --critical:#B81452; --critical-soft:#F6DCE4;
+  color-scheme: light;
+}
+
+/* ============ RESET / BASE ============ */
+*,*::before,*::after{box-sizing:border-box;}
+html{-webkit-text-size-adjust:100%;}
+body{
+  margin:0; background:var(--bg); color:var(--text);
+  font-family:var(--font-body); font-size:15px; line-height:1.5;
+  padding-inline:max(16px,calc((100vw - 1080px)/2));
+}
+h1,h2,h3{font-family:var(--font-display); text-transform:uppercase; letter-spacing:.02em; margin:0; text-wrap:balance;}
+p{margin:0;}
+button{font-family:inherit; cursor:pointer;}
+a{color:var(--accent-2);}
+::selection{background:var(--accent); color:var(--on-accent);}
+.tnum{font-family:var(--font-mono); font-variant-numeric:tabular-nums;}
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0);}
+:focus-visible{outline:2px solid var(--accent-2); outline-offset:2px;}
+@media (prefers-reduced-motion: reduce){ *{animation-duration:.01ms !important; transition-duration:.01ms !important;} }
+
+/* ============ LAYOUT SHELLS ============ */
+.wrap{max-width:1080px; margin-inline:auto;}
+.topbar{
+  position:sticky; top:0; z-index:20; background:var(--bg);
+  border-bottom:1px solid var(--border);
+  padding-block:14px;
+}
+.topbar-inner{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+.brand{display:flex; align-items:baseline; gap:10px;}
+.brand-mark{font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:.06em;}
+.brand-tag{font-size:12px; color:var(--text-muted); display:none;}
+@media(min-width:560px){ .brand-tag{display:inline;} }
+.top-actions{display:flex; align-items:center; gap:10px;}
+.streak-chip{
+  display:flex; align-items:center; gap:6px; background:var(--accent-soft); color:var(--accent);
+  border:1px solid var(--accent); border-radius:999px; padding:5px 12px 5px 10px; font-weight:600; font-size:13px;
+}
+.streak-chip svg{width:15px; height:15px;}
+.icon-btn{
+  width:36px; height:36px; display:grid; place-items:center; border-radius:var(--radius);
+  border:1px solid var(--border); background:var(--surface); color:var(--text-muted);
+}
+.icon-btn svg{width:18px; height:18px;}
+.icon-btn:hover{color:var(--text); border-color:var(--border-strong);}
+
+main{padding-block:22px 60px; display:flex; flex-direction:column; gap:20px;}
+
+.panel{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:18px;
+}
+.panel-head{display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap;}
+.panel-title{font-size:13px; letter-spacing:.08em; color:var(--text-muted); text-transform:uppercase; font-weight:600;}
+.eyebrow{font-family:var(--font-display); font-size:12px; letter-spacing:.12em; text-transform:uppercase; color:var(--accent);}
+
+/* ============ DEMO BANNER ============ */
+.demo-banner{
+  display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;
+  background:var(--accent-2-soft); border:1px solid var(--accent-2); color:var(--text);
+  border-radius:var(--radius-lg); padding:11px 16px; font-size:13px;
+}
+.demo-banner b{color:var(--accent-2);}
+.btn-ghost-sm{
+  border:1px solid var(--border-strong); background:transparent; color:var(--text);
+  border-radius:var(--radius); padding:6px 12px; font-size:12.5px; font-weight:600; white-space:nowrap;
+}
+.btn-ghost-sm:hover{background:var(--surface-2);}
+
+/* ============ HERO / TODAY ============ */
+.hero{
+  background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  border:1px solid var(--border); border-radius:var(--radius-lg); overflow:hidden;
+}
+.hero-top{padding:22px 22px 0;}
+.hero-daylabel{display:flex; align-items:center; gap:10px; flex-wrap:wrap;}
+.hero-day{font-family:var(--font-display); font-size:clamp(30px,6vw,46px); font-weight:700; line-height:1;}
+.hero-date{color:var(--text-muted); font-size:13px;}
+.hero-focus{margin-top:6px; font-size:16px; font-weight:600; color:var(--accent);}
+.hero-muscles{color:var(--text-muted); font-size:13px; margin-top:2px;}
+.hero-meta{display:flex; gap:18px; margin-top:16px; flex-wrap:wrap;}
+.meta-item{display:flex; flex-direction:column; gap:2px;}
+.meta-item .v{font-family:var(--font-mono); font-size:17px; font-weight:600;}
+.meta-item .l{font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.06em;}
+
+.ex-list{list-style:none; margin:18px 0 0; padding:0; display:flex; flex-direction:column; border-top:1px solid var(--border);}
+.ex-row{display:flex; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border);}
+.ex-num{
+  font-family:var(--font-mono); font-size:12px; color:var(--text-faint); width:20px; text-align:center;
+  border:1px solid var(--border-strong); border-radius:50%; height:20px; line-height:18px; flex:none;
+}
+.ex-row.done .ex-num{background:var(--good); border-color:var(--good); color:var(--on-accent);}
+.ex-name{font-weight:600; font-size:14px;}
+.ex-area{font-size:12px; color:var(--text-muted);}
+.ex-video{
+  margin-left:auto; flex:none; display:flex; align-items:center; gap:5px; font-size:12px; font-weight:600;
+  color:var(--accent-2); border:1px solid var(--accent-2); border-radius:999px; padding:5px 10px; white-space:nowrap;
+}
+.ex-video svg{width:11px; height:11px;}
+.ex-video:hover{background:var(--accent-2-soft);}
+
+.hero-actions{
+  display:flex; gap:10px; align-items:center; padding:18px 22px; flex-wrap:wrap;
+  border-top:1px solid var(--border); background:var(--surface); margin-top:18px;
+}
+.btn{
+  border:none; border-radius:var(--radius); padding:12px 20px; font-weight:700; font-size:14px;
+  letter-spacing:.02em; display:inline-flex; align-items:center; gap:8px;
+}
+.btn-primary{background:var(--accent); color:var(--on-accent);}
+.btn-primary:hover{filter:brightness(1.08);}
+.btn-secondary{background:transparent; border:1px solid var(--border-strong); color:var(--text);}
+.btn-secondary:hover{background:var(--surface-2);}
+.btn:disabled{opacity:.5; cursor:not-allowed;}
+.stage-note{font-size:12px; color:var(--text-muted); margin-left:auto;}
+
+/* habit checklist */
+.habit-wrap{padding:0 22px 20px;}
+.habit-title{font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--text-faint); margin-bottom:8px; font-weight:600;}
+.habit-grid{display:flex; flex-wrap:wrap; gap:8px;}
+.habit-chip{
+  border:1px solid var(--border-strong); background:var(--surface); color:var(--text-muted);
+  border-radius:999px; padding:7px 13px; font-size:12.5px; font-weight:600; display:flex; align-items:center; gap:6px;
+}
+.habit-chip svg{width:13px; height:13px; flex:none;}
+.habit-chip.on{background:var(--good-soft); border-color:var(--good); color:var(--good);}
+
+/* weekend hero variant */
+.weekend-body{padding:22px;}
+.weekend-cards{display:grid; grid-template-columns:1fr; gap:12px; margin-top:16px;}
+@media(min-width:640px){ .weekend-cards{grid-template-columns:1fr 1fr;} }
+.wk-card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:14px;}
+.wk-card h3{font-size:15px; font-family:var(--font-body); font-weight:800; text-transform:none; letter-spacing:0; margin-bottom:4px;}
+.wk-card p{font-size:13px; color:var(--text-muted);}
+
+/* ============ TIMER ============ */
+.timer-overlay{
+  position:fixed; inset:0; background:color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter:blur(6px);
+  display:flex; align-items:center; justify-content:center; z-index:100; padding:16px;
+}
+.timer-card{
+  background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-lg);
+  width:min(480px,100%); max-height:92vh; overflow-y:auto; padding:26px 22px 22px; text-align:center; position:relative;
+}
+.timer-close{position:absolute; top:12px; right:12px;}
+.timer-phase{font-family:var(--font-display); font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-muted);}
+.timer-phase.work{color:var(--accent);}
+.timer-phase.rest{color:var(--accent-2);}
+.timer-ring-wrap{position:relative; width:220px; height:220px; margin:14px auto;}
+.timer-ring-wrap svg{width:100%; height:100%; transform:rotate(-90deg);}
+.timer-ring-track{fill:none; stroke:var(--border); stroke-width:10;}
+.timer-ring-bar{fill:none; stroke:var(--accent); stroke-width:10; stroke-linecap:round; transition:stroke-dashoffset .25s linear;}
+.timer-ring-bar.rest{stroke:var(--accent-2);}
+.timer-center{position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:2px;}
+.timer-num{font-family:var(--font-mono); font-size:44px; font-weight:700;}
+.timer-round{font-size:12px; color:var(--text-muted);}
+.timer-exname{font-size:19px; font-weight:800; margin-top:6px; text-wrap:balance;}
+.timer-exarea{font-size:12.5px; color:var(--text-muted); margin-top:2px;}
+.timer-video-wrap{margin:14px 0 2px;}
+.timer-video-box{border-radius:var(--radius); overflow:hidden; aspect-ratio:16/9; background:#000;}
+.timer-video-box iframe{width:100%; height:100%; border:0; display:block;}
+.timer-video-help{display:block; text-align:center; margin-top:6px; font-size:12px; color:var(--text-muted);}
+.timer-video-help a{color:var(--text-muted); text-decoration:underline; text-underline-offset:2px;}
+.timer-video-retry{background:none; border:0; padding:0; margin:0; font:inherit; font-size:12px; color:var(--text-muted); text-decoration:underline; text-underline-offset:2px; cursor:pointer;}
+.timer-next{font-size:12px; color:var(--text-faint); margin-top:10px;}
+.timer-controls{display:flex; gap:10px; justify-content:center; margin-top:18px;}
+
+/* ============ KPI GRID ============ */
+.kpi-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:10px;}
+@media(min-width:720px){ .kpi-grid{grid-template-columns:repeat(4,1fr);} }
+.kpi{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:15px 16px;
+  display:flex; flex-direction:column; gap:6px;
+}
+.kpi .l{font-size:11.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-muted); font-weight:600;}
+.kpi .v{font-family:var(--font-display); font-size:30px; font-weight:700; display:flex; align-items:baseline; gap:5px;}
+.kpi .v small{font-family:var(--font-body); font-size:14px; color:var(--text-muted); font-weight:500;}
+.kpi .trend{font-size:12px; font-weight:600;}
+.kpi .trend.pos{color:var(--good);}
+.kpi .trend.neg{color:var(--critical);}
+.kpi .trend.flat{color:var(--text-muted);}
+
+/* ============ CHARTS ============ */
+.chart-grid{display:grid; grid-template-columns:1fr; gap:16px;}
+@media(min-width:860px){ .chart-grid{grid-template-columns:1fr 1fr;} }
+.chart-box{position:relative;}
+.chart-box svg{width:100%; height:auto; display:block; overflow:visible;}
+.chart-legend{display:flex; gap:14px; margin-bottom:10px; flex-wrap:wrap;}
+.legend-item{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-muted);}
+.legend-swatch{width:10px; height:10px; border-radius:2px; flex:none;}
+.tooltip{
+  position:absolute; pointer-events:none; background:var(--surface-3); border:1px solid var(--border-strong);
+  border-radius:6px; padding:7px 10px; font-size:12px; line-height:1.4; box-shadow:0 4px 14px rgba(0,0,0,.25);
+  transform:translate(-50%,-115%); white-space:nowrap; opacity:0; transition:opacity .1s;
+}
+.tooltip.show{opacity:1;}
+.tooltip b{font-family:var(--font-mono);}
+.chart-empty{font-size:13px; color:var(--text-muted); padding:30px 0; text-align:center;}
+
+/* ============ TABLE ============ */
+.table-scroll{overflow-x:auto;}
+table.log{width:100%; border-collapse:collapse; font-size:13px; min-width:560px;}
+table.log th{
+  text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint);
+  font-weight:600; padding:0 10px 8px; border-bottom:1px solid var(--border);
+}
+table.log td{padding:9px 10px; border-bottom:1px solid var(--border); vertical-align:middle;}
+table.log tr:last-child td{border-bottom:none;}
+.pill{display:inline-flex; align-items:center; gap:5px; font-size:11.5px; font-weight:700; padding:3px 9px; border-radius:999px;}
+.pill.good{background:var(--good-soft); color:var(--good);}
+.pill.miss{background:var(--critical-soft); color:var(--critical);}
+.row-note{color:var(--text-muted); font-size:12px;}
+
+/* ============ FEEDBACK ============ */
+.fb-form{display:flex; flex-direction:column; gap:14px;}
+.field{display:flex; flex-direction:column; gap:6px;}
+.field label{font-size:12.5px; font-weight:600; color:var(--text-muted);}
+.field textarea, .field input[type=text]{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text);
+  padding:10px 12px; font-family:inherit; font-size:14px; resize:vertical;
+}
+.field textarea{min-height:64px;}
+.rate-row{display:flex; gap:6px; flex-wrap:wrap;}
+.rate-btn{
+  width:34px; height:34px; border-radius:50%; border:1px solid var(--border-strong); background:var(--surface);
+  color:var(--text-muted); font-family:var(--font-mono); font-weight:600; font-size:13px;
+}
+.rate-btn.sel{background:var(--accent); border-color:var(--accent); color:var(--on-accent);}
+.fb-history{display:flex; flex-direction:column; gap:10px; margin-top:18px; padding-top:16px; border-top:1px solid var(--border);}
+.fb-item{background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px;}
+.fb-item .hd{display:flex; justify-content:space-between; font-size:12px; color:var(--text-muted); margin-bottom:6px;}
+.fb-item .hd b{color:var(--text); font-family:var(--font-mono);}
+.fb-item p{font-size:13px; margin-top:4px;}
+.fb-item .lbl{font-size:11px; text-transform:uppercase; color:var(--text-faint); letter-spacing:.05em; margin-top:8px;}
+
+/* ============ BADGES ============ */
+.badge-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px;}
+.badge{
+  border:1px solid var(--border); border-radius:var(--radius); padding:12px; text-align:center;
+  background:var(--surface-2); opacity:.45;
+}
+.badge.earned{opacity:1; background:var(--accent-soft); border-color:var(--accent);}
+.badge svg{width:26px; height:26px; margin-bottom:6px;}
+.badge .n{font-size:12.5px; font-weight:700;}
+.badge .d{font-size:11px; color:var(--text-muted); margin-top:2px;}
+
+/* ============ QUOTE ============ */
+.quote-panel{display:flex; gap:14px; align-items:flex-start;}
+.quote-panel svg{width:26px; height:26px; color:var(--accent); flex:none; margin-top:2px;}
+.quote-text{font-family:var(--font-display); font-size:19px; font-weight:600; line-height:1.35; text-wrap:balance;}
+.quote-src{margin-top:6px; font-size:12px; color:var(--text-muted);}
+
+/* ============ REFERENCE (nutrition drawer) ============ */
+details.ref summary{cursor:pointer; list-style:none; display:flex; align-items:center; justify-content:space-between;}
+details.ref summary::-webkit-details-marker{display:none;}
+.ref-chevron{transition:transform .15s;}
+details[open] .ref-chevron{transform:rotate(180deg);}
+.ref-body{margin-top:16px; display:flex; flex-direction:column; gap:16px;}
+.food-grid{display:grid; grid-template-columns:1fr; gap:10px;}
+@media(min-width:700px){ .food-grid{grid-template-columns:1fr 1fr;} }
+.food-card{background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px;}
+.food-card .g{font-weight:800; font-size:13px;}
+.food-card .f{font-size:12.5px; color:var(--accent-2); margin-top:2px;}
+.food-card .w{font-size:12px; color:var(--text-muted); margin-top:5px;}
+.tips-list{margin:0; padding-left:18px; font-size:13px; color:var(--text-muted); display:flex; flex-direction:column; gap:6px;}
+.pace-note{font-size:12px; color:var(--text-faint); font-style:italic; border-top:1px solid var(--border); padding-top:12px;}
+
+/* ============ SETTINGS MODAL ============ */
+.modal-overlay{
+  position:fixed; inset:0; background:color-mix(in srgb, var(--bg) 75%, transparent); backdrop-filter:blur(4px);
+  display:flex; align-items:center; justify-content:center; z-index:100; padding:16px;
+}
+.modal-card{
+  background:var(--surface); border:1px solid var(--border-strong); border-radius:var(--radius-lg);
+  width:min(440px,100%); padding:22px; display:flex; flex-direction:column; gap:14px; max-height:90vh; overflow-y:auto;
+}
+.modal-card h2{font-size:18px;}
+.field input[type=number]{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text);
+  padding:9px 12px; font-family:var(--font-mono); font-size:14px; width:100%;
+}
+.settings-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+.footer-note{text-align:center; color:var(--text-faint); font-size:11.5px; padding-block:10px 30px;}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="wrap topbar-inner">
+    <div class="brand">
+      <span class="brand-mark">NHỊP</span>
+      <span class="brand-tag">15 phút mỗi ngày</span>
+    </div>
+    <div class="top-actions">
+      <span class="streak-chip" id="streakChip">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-1 4.5-2.5 6C7.8 9.8 7 11.5 7 13.5 7 17.6 9.7 20 12 20s5-2.2 5-6c0-2-.9-3.2-1.7-4.3.3 1.6-.4 2.6-1.1 2.6-.9 0-1.2-.9-.9-1.8.6-1.8.2-4.8-1.3-8.5z"/></svg>
+        <span class="tnum" id="streakVal">0</span> ngày
+      </span>
+      <button class="icon-btn" id="btnTheme" title="Đổi giao diện sáng/tối" aria-label="Đổi giao diện sáng/tối"></button>
+      <button class="icon-btn" id="btnSettings" title="Cài đặt" aria-label="Cài đặt">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.6V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.6 1z"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+<main class="wrap">
+  <div class="demo-banner" id="demoBanner" hidden>
+    <span>Đây là <b>dữ liệu mẫu</b> minh hoạ cách app hoạt động — nhật ký, biểu đồ và feedback bên dưới chưa phải dữ liệu thật của bạn.</span>
+    <button class="btn-ghost-sm" id="btnClearDemo">Xoá dữ liệu mẫu</button>
+  </div>
+
+  <!-- HERO -->
+  <section class="hero" id="hero"></section>
+
+  <!-- KPI -->
+  <section>
+    <div class="panel-title" style="margin-bottom:10px;">Tổng quan</div>
+    <div class="kpi-grid" id="kpiGrid"></div>
+  </section>
+
+  <!-- CHARTS -->
+  <section class="chart-grid">
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Cân nặng</span>
+        <span class="panel-title" style="margin:0;">Xu hướng theo thời gian</span>
+      </div>
+      <div class="chart-box" id="weightChartBox"></div>
+    </div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Độ đều đặn</span>
+        <span class="panel-title" style="margin:0;">Tỷ lệ hoàn thành theo tuần</span>
+      </div>
+      <div class="chart-box" id="adherenceChartBox"></div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="panel">
+    <div class="panel-head">
+      <span class="panel-title" style="margin:0;">Nhật ký buổi tập gần đây</span>
+    </div>
+    <div class="table-scroll">
+      <table class="log" id="historyTable">
+        <thead><tr>
+          <th>Ngày</th><th>Trọng tâm</th><th>Trạng thái</th><th>Thời gian</th><th>RPE</th><th>Cân nặng</th><th>Ghi chú</th>
+        </tr></thead>
+        <tbody id="historyBody"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- BADGES -->
+  <section class="panel">
+    <div class="panel-head"><span class="panel-title" style="margin:0;">Huy hiệu thành tích</span></div>
+    <div class="badge-grid" id="badgeGrid"></div>
+  </section>
+
+  <!-- FEEDBACK -->
+  <section class="panel">
+    <div class="panel-head"><span class="panel-title" style="margin:0;">Feedback cuối tuần</span></div>
+    <form class="fb-form" id="fbForm">
+      <div class="field">
+        <label>Điều gì hiệu quả tuần này?</label>
+        <textarea id="fbWorked" placeholder="VD: Các bài chân làm tốt, không mỏi nhiều…"></textarea>
+      </div>
+      <div class="field">
+        <label>Điều gì cần cải thiện?</label>
+        <textarea id="fbImprove" placeholder="VD: Push-up vòng 2 còn yếu…"></textarea>
+      </div>
+      <div class="field">
+        <label>Thay đổi áp dụng tuần sau</label>
+        <textarea id="fbChange" placeholder="VD: Đổi push-up thường sang push-up trên đầu gối…"></textarea>
+      </div>
+      <div class="field">
+        <label>Mức độ hài lòng (1–10)</label>
+        <div class="rate-row" id="fbRate"></div>
+      </div>
+      <div>
+        <button type="submit" class="btn btn-primary">Lưu feedback tuần này</button>
+      </div>
+    </form>
+    <div class="fb-history" id="fbHistory"></div>
+  </section>
+
+  <!-- QUOTE -->
+  <section class="panel quote-panel">
+    <svg viewBox="0 0 24 24" fill="currentColor"><path d="M7.4 17.5c-1.6 0-2.9-.5-3.9-1.6C2.5 14.8 2 13.4 2 11.7c0-1.9.6-3.6 1.9-5.2C5.2 5 6.9 3.7 9 2.7l1.1 1.8C8.5 5.4 7.2 6.4 6.3 7.5c-.9 1.1-1.3 2.1-1.3 3 0 .3 0 .6.1.8.5-.3 1-.4 1.6-.4 1.1 0 2 .3 2.7 1 .7.7 1.1 1.6 1.1 2.6 0 1.1-.4 2-1.1 2.7-.7.7-1.7 1.3-3 1.3zm10.6 0c-1.6 0-2.9-.5-3.9-1.6-1-1.1-1.5-2.5-1.5-4.2 0-1.9.6-3.6 1.9-5.2 1.3-1.5 3-2.8 5.1-3.8l1.1 1.8c-1.6.9-2.9 1.9-3.8 3-.9 1.1-1.3 2.1-1.3 3 0 .3 0 .6.1.8.5-.3 1-.4 1.6-.4 1.1 0 2 .3 2.7 1 .7.7 1.1 1.6 1.1 2.6 0 1.1-.4 2-1.1 2.7-.7.7-1.7 1.3-3 1.3z"/></svg>
+    <div>
+      <div class="quote-text" id="quoteText">—</div>
+      <div class="quote-src" id="quoteSrc"></div>
+    </div>
+  </section>
+
+  <!-- REFERENCE -->
+  <section class="panel">
+    <details class="ref">
+      <summary>
+        <span class="panel-title" style="margin:0;">Tài liệu tham khảo — Dinh dưỡng &amp; thói quen</span>
+        <svg class="ref-chevron" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+      </summary>
+      <div class="ref-body">
+        <div class="food-grid" id="foodGrid"></div>
+        <div>
+          <div class="habit-title">Mẹo ăn no lâu hơn</div>
+          <ul class="tips-list" id="tipsList"></ul>
+        </div>
+        <p class="pace-note">Mục tiêu giảm từ 95kg xuống 80kg trong 3 tháng (~1,1–1,3kg/tuần) nhanh hơn mức khuyến nghị phổ biến (0,5–1kg/tuần). Phần lớn kết quả đến từ chế độ ăn hơn là 15 phút tập/ngày; nếu theo đuổi tốc độ này nên có bác sĩ/chuyên gia dinh dưỡng theo dõi cùng. Thông tin tham khảo chung, không thay thế tư vấn y tế.</p>
+      </div>
+    </details>
+  </section>
+
+  <div class="footer-note">NHỊP · bản offline — dữ liệu lưu ngay trên trình duyệt này, không đồng bộ thiết bị khác · lịch tập Thứ 2–Thứ 6, cuối tuần vận động nhẹ</div>
+</main>
+
+<!-- SETTINGS MODAL -->
+<div class="modal-overlay" id="settingsOverlay" hidden>
+  <div class="modal-card">
+    <h2>Cài đặt</h2>
+    <div class="settings-row">
+      <div class="field">
+        <label>Cân nặng bắt đầu (kg)</label>
+        <input type="number" step="0.1" id="setStartW">
+      </div>
+      <div class="field">
+        <label>Mục tiêu (kg)</label>
+        <input type="number" step="0.1" id="setTargetW">
+      </div>
+    </div>
+    <div class="field">
+      <label>Ngày bắt đầu chương trình</label>
+      <input type="text" id="setStartDate" placeholder="YYYY-MM-DD">
+    </div>
+    <div class="field">
+      <label>Tuần đang tập (tự tăng dần mức độ khó)</label>
+      <input type="number" step="1" min="1" id="setWeek">
+    </div>
+    <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px;">
+      <button class="btn btn-secondary" id="btnCancelSettings" type="button">Huỷ</button>
+      <button class="btn btn-primary" id="btnSaveSettings" type="button">Lưu</button>
+    </div>
+  </div>
+</div>
+
+<!-- TIMER OVERLAY -->
+<div class="timer-overlay" id="timerOverlay" hidden>
+  <div class="timer-card">
+    <button class="icon-btn timer-close" id="btnCloseTimer" aria-label="Đóng">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <div class="timer-phase" id="timerPhase">KHỞI ĐỘNG</div>
+    <div class="timer-ring-wrap">
+      <svg viewBox="0 0 220 220">
+        <circle class="timer-ring-track" cx="110" cy="110" r="96"/>
+        <circle class="timer-ring-bar" id="timerRingBar" cx="110" cy="110" r="96"/>
+      </svg>
+      <div class="timer-center">
+        <div class="timer-num tnum" id="timerNum">2:00</div>
+        <div class="timer-round" id="timerRound">Chuẩn bị</div>
+      </div>
+    </div>
+    <div class="timer-exname" id="timerExName">Xoay khớp, khởi động nhẹ</div>
+    <div class="timer-exarea" id="timerExArea"></div>
+    <div class="timer-video-wrap" id="timerVideoWrap" hidden>
+      <div class="timer-video-box">
+        <iframe id="timerVideoFrame" src="" title="Video hướng dẫn bài tập" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowfullscreen loading="lazy"></iframe>
+      </div>
+      <span class="timer-video-help">Video không phát được? <button type="button" class="timer-video-retry" id="timerVideoRetry">Thử lại</button> · <a id="timerVideoLink" href="#" target="_blank" rel="noopener">Mở trên YouTube ↗</a></span>
+    </div>
+    <div class="timer-next" id="timerNext"></div>
+    <div class="timer-controls">
+      <button class="btn btn-secondary" id="btnTimerPause">Tạm dừng</button>
+      <button class="btn btn-primary" id="btnTimerSkip">Bỏ qua &rarr;</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= PROGRAM DATA ================= */
+var DAY_ORDER = ["t2","t3","t4","t5","t6"];
+var PROGRAM = {
+  t2:{ label:"Thứ Hai", focus:"Đẩy (Push) + Core", muscles:"Ngực, vai, tay sau, bụng", exercises:[
+    {n:"Push-up (chống đẩy)", a:"Ngực, vai, tay sau", v:"WDIpL0pjun0"},
+    {n:"Squat", a:"Đùi, mông", v:"cB0cOX7gePg"},
+    {n:"Pike push-up (chống đẩy hình chữ V)", a:"Vai", v:"pHR5yG6xBps"},
+    {n:"Mountain climber", a:"Core, cardio", v:"Q_olQdxEPF4"},
+    {n:"Plank shoulder tap", a:"Core, vai ổn định", v:"gKA5LBy7WAI"},
+    {n:"Jumping jack", a:"Toàn thân, cardio", v:"uLVt6u15L98"}
+  ]},
+  t3:{ label:"Thứ Ba", focus:"Thân dưới (Lower Body)", muscles:"Đùi trước, đùi sau, mông, bắp chân", exercises:[
+    {n:"Squat", a:"Đùi trước, mông", v:"cB0cOX7gePg"},
+    {n:"Lunge xen kẽ (alternating lunge)", a:"Đùi, mông", v:"ALl174GTuoY"},
+    {n:"Glute bridge (cầu mông)", a:"Mông, đùi sau", v:"nuapk_-Q2BI"},
+    {n:"Single-leg deadlift (một chân)", a:"Đùi sau, thăng bằng", v:"gz9l8UA_KXs"},
+    {n:"Calf raise (nhón gót)", a:"Bắp chân", v:"97NbelB5yvQ"},
+    {n:"Wall sit hoặc Jump squat", a:"Đùi, sức bền cơ", v:"JaZNYM3zAP0"}
+  ]},
+  t4:{ label:"Thứ Tư", focus:"Kéo (Pull) + Lưng/Vai sau", muscles:"Lưng, vai sau, core ổn định", exercises:[
+    {n:"Superman", a:"Lưng dưới", v:"UXUGfiNL1lI"},
+    {n:"Reverse snow angel / Y-T-W raise", a:"Lưng trên, vai sau", v:"s0u7kRVim_4"},
+    {n:"Bird-dog", a:"Core, lưng, thăng bằng", v:"ZdAHe9_HeEw"},
+    {n:"Glute bridge march", a:"Mông, core", v:"UEwJjVb_CD4"},
+    {n:"Plank", a:"Core toàn thân", v:"mwlp75MS6Rg"},
+    {n:"Burpee (bỏ chống đẩy nếu mới tập)", a:"Toàn thân, cardio", v:"wGvBfVeCNko"}
+  ]},
+  t5:{ label:"Thứ Năm", focus:"Sức bền/Cardio (Conditioning)", muscles:"Tim mạch, core, toàn thân", exercises:[
+    {n:"High knees (chạy nâng cao gối)", a:"Cardio", v:"IrqItHfTXos"},
+    {n:"Jumping jack", a:"Toàn thân, cardio", v:"uLVt6u15L98"},
+    {n:"Butt kicks (gót chạm mông)", a:"Cardio, đùi sau", v:"oMW59TKZvaI"},
+    {n:"Mountain climber", a:"Core, cardio", v:"Q_olQdxEPF4"},
+    {n:"Squat jump (hoặc squat thường)", a:"Đùi, sức mạnh bộc phát", v:"tZSYZdtbONc"},
+    {n:"Plank walk-up", a:"Core, vai", v:"xl8DfHxWdOE"}
+  ]},
+  t6:{ label:"Thứ Sáu", focus:"Toàn thân tổng hợp", muscles:"Tất cả nhóm cơ (buổi đo tiến bộ)", exercises:[
+    {n:"Push-up", a:"Ngực, vai, tay sau", v:"WDIpL0pjun0"},
+    {n:"Squat", a:"Đùi, mông", v:"cB0cOX7gePg"},
+    {n:"Superman hoặc Y-T-W raise", a:"Lưng", v:"UXUGfiNL1lI"},
+    {n:"Lunge xen kẽ", a:"Đùi, mông", v:"ALl174GTuoY"},
+    {n:"Plank", a:"Core", v:"mwlp75MS6Rg"},
+    {n:"Burpee (bài kết)", a:"Toàn thân", v:"wGvBfVeCNko"}
+  ]}
+};
+var HABITS_DEF = [
+  {k:"protein", l:"Đủ đạm"},
+  {k:"sleep", l:"Ngủ 7-8h"},
+  {k:"water", l:"Đủ nước"},
+  {k:"move", l:"Vận động thêm"},
+  {k:"noAlcohol", l:"Không rượu bia"},
+  {k:"weighed", l:"Cân đúng giờ"}
+];
+var FOOD_REF = [
+  ["Tinh bột giàu xơ","Khoai lang/khoai tây luộc, yến mạch, gạo lứt, quinoa","Nhiều nước + chất xơ, tiêu hoá chậm nên no lâu hơn cơm trắng."],
+  ["Đạm nạc","Trứng luộc, ức gà, cá hấp/nướng, đậu hũ, sữa chua Hy Lạp","Đạm no lâu nhất trên mỗi calo, giảm đói giữa các bữa."],
+  ["Canh / súp","Canh rau, canh chua, canh bí đao, súp rau củ","Nước lớn giúp no nhanh mà rất ít calo."],
+  ["Rau xanh","Rau luộc, salad, rau sống ăn kèm","Thể tích lớn, calo gần như không đáng kể."],
+  ["Đậu các loại","Đậu đen, đậu xanh, đậu lăng, đậu hũ","Xơ + đạm thực vật — no hơn ~31% so với bữa không có đậu."],
+  ["Trái cây nguyên miếng","Ổi, táo, cam, bưởi, thanh long","No hơn hẳn nước ép/trái cây sấy (đậm độ calo cao hơn)."],
+  ["Ăn vặt lành mạnh","Bắp rang không bơ, các loại hạt (vừa phải)","Nhiều xơ mỗi thể tích; hạt no lâu nhưng đậm độ calo cao."]
+];
+var TIPS_REF = [
+  "Ăn 1 chén canh hoặc uống 1 ly nước trước bữa chính 15-20 phút để giảm lượng ăn tổng thể.",
+  "Ưu tiên luộc/hấp/nướng thay vì chiên xào nhiều dầu mỡ.",
+  "Ăn rau trước, tinh bột và đạm sau trong cùng bữa ăn.",
+  "Nhai chậm — não cần khoảng 20 phút mới nhận tín hiệu no."
+];
+var QUOTES = [
+  ["15 phút hôm nay tốt hơn 0 phút hoàn hảo.",""],
+  ["Không cần tập giỏi hơn hôm qua, chỉ cần tập.",""],
+  ["Chuỗi ngày bạn giữ được quan trọng hơn cường độ một buổi.",""],
+  ["Cơ thể thay đổi ở tuần thứ 3, không phải ngày thứ 3.",""],
+  ["Buổi tập tệ nhất vẫn tốt hơn buổi không tập.",""],
+  ["Đều đặn thắng cố gắng dồn dập.",""],
+  ["Bạn không cần động lực, bạn cần một thói quen.",""],
+  ["Giảm cân là toán học chậm — mỗi buổi tập là một số cộng nhỏ.",""]
+];
+
+function ytUrl(id){ return "https://www.youtube.com/watch?v="+id; }
+function pad2(n){ return (n<10?"0":"")+n; }
+function isoDate(d){ return d.getFullYear()+"-"+pad2(d.getMonth()+1)+"-"+pad2(d.getDate()); }
+function parseISO(s){ var p=s.split("-"); return new Date(+p[0], +p[1]-1, +p[2]); }
+function addDays(d,n){ var r=new Date(d); r.setDate(r.getDate()+n); return r; }
+function dowIndex(d){ return d.getDay(); } // 0 Sun .. 6 Sat
+function dayKeyFor(d){ var w=dowIndex(d); return w>=1&&w<=5 ? DAY_ORDER[w-1] : null; }
+function vnWeekdayLabel(d){
+  var w=dowIndex(d);
+  return ["Chủ Nhật","Thứ Hai","Thứ Ba","Thứ Tư","Thứ Năm","Thứ Sáu","Thứ Bảy"][w];
+}
+function shortDate(d){ return pad2(d.getDate())+"/"+pad2(d.getMonth()+1); }
+function fmtKg(v){ return (v==null) ? "—" : (Math.round(v*10)/10).toFixed(1); }
+
+/* ================= THEME TOGGLE ================= */
+var THEME_KEY = "nhip_theme_pref";
+var SUN_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>';
+var MOON_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.6A9 9 0 1 1 11.4 3a7 7 0 0 0 9.6 9.6z"/></svg>';
+function systemIsLight(){ return !!(window.matchMedia && window.matchMedia("(prefers-color-scheme: light)").matches); }
+function effectiveTheme(){
+  var attr = document.documentElement.getAttribute("data-theme");
+  if(attr==="light"||attr==="dark") return attr;
+  return systemIsLight() ? "light" : "dark";
+}
+function renderThemeIcon(){
+  var btn = document.getElementById("btnTheme");
+  if(!btn) return;
+  var eff = effectiveTheme();
+  btn.innerHTML = eff==="dark" ? SUN_ICON : MOON_ICON;
+  btn.title = eff==="dark" ? "Chuyển sang giao diện sáng" : "Chuyển sang giao diện tối";
+}
+function applyTheme(pref){
+  if(pref==="light"||pref==="dark") document.documentElement.setAttribute("data-theme", pref);
+  else document.documentElement.removeAttribute("data-theme");
+  renderThemeIcon();
+}
+function initTheme(){
+  var saved = null;
+  try{ saved = localStorage.getItem(THEME_KEY); }catch(e){}
+  applyTheme(saved);
+  var btn = document.getElementById("btnTheme");
+  if(btn) btn.addEventListener("click", function(){
+    var next = effectiveTheme()==="dark" ? "light" : "dark";
+    try{ localStorage.setItem(THEME_KEY, next); }catch(e){}
+    applyTheme(next);
+    renderWeightChart();
+    renderAdherenceChart();
+  });
+}
+
+function getStage(week){
+  if(week<=2) return {work:40, rest:20, rounds:2, label:"Tuần 1–2 · 40s tập / 20s nghỉ · 2 vòng"};
+  if(week<=4) return {work:45, rest:15, rounds:2, label:"Tuần 3–4 · 45s tập / 15s nghỉ · 2 vòng"};
+  if(week<=6) return {work:45, rest:10, rounds:2, label:"Tuần 5–6 · 45s tập / 10s nghỉ · biến thể khó hơn"};
+  return {work:45, rest:10, rounds:3, label:"Tuần 7+ · 45s tập / 10s nghỉ · 3 vòng (~20 phút)"};
+}
+function estDuration(stage){
+  var main = stage.rounds*6*(stage.work+stage.rest) - stage.rest; // no rest after final exercise
+  return Math.round((120+main+120)/60);
+}
+
+/* ================= STATE ================= */
+var today = new Date();
+var TODAY_ISO = isoDate(today);
+var state = {
+  settings:{ startWeightKg:95, targetWeightKg:80, startDate:TODAY_ISO, currentWeek:1 },
+  sessions:{},      // iso -> doc
+  feedback:[],      // array of docs
+  fbRating:null
+};
+
+/* ================= RENDER: HERO ================= */
+function renderHero(){
+  var el = document.getElementById("hero");
+  var dow = dowIndex(today);
+  if(dow===0 || dow===6){
+    renderWeekendHero(el, dow);
+  } else {
+    renderWeekdayHero(el);
+  }
+}
+
+function renderWeekendHero(el, dow){
+  var isSat = dow===6;
+  el.innerHTML =
+    '<div class="hero-top weekend-body">'+
+      '<div class="hero-daylabel"><span class="hero-day">'+vnWeekdayLabel(today)+'</span><span class="hero-date">'+shortDate(today)+'</span></div>'+
+      '<div class="hero-focus">Cuối tuần — không phải HIIT như ngày thường</div>'+
+      '<div class="weekend-cards">'+
+        '<div class="wk-card"><h3>Thứ 7 — vận động nhẹ‑vừa</h3><p>30–45 phút: đi bộ nhanh, đạp xe nhẹ, bơi, hoặc môn thể thao bạn thích. Tăng calo tiêu hao mà không thêm áp lực hồi phục.</p></div>'+
+        '<div class="wk-card"><h3>Chủ Nhật — nghỉ ngơi tích cực</h3><p>Đi bộ nhẹ 20–30 phút, giãn cơ/foam rolling, hoặc nghỉ hẳn nếu tuần đã mệt. Ngày tốt để điền feedback bên dưới.</p></div>'+
+      '</div>'+
+      '<div class="habit-title" style="margin-top:18px;">Thói quen bổ trợ hôm nay</div>'+
+      '<div class="habit-grid" id="habitGrid"></div>'+
+    '</div>';
+  renderHabitChips(document.getElementById("habitGrid"), TODAY_ISO);
+}
+
+function renderWeekdayHero(el){
+  var key = dayKeyFor(today);
+  var d = PROGRAM[key];
+  var sess = state.sessions[TODAY_ISO];
+  var done = !!(sess && sess.completed);
+  var stage = getStage(state.settings.currentWeek);
+
+  var rows = d.exercises.map(function(ex, i){
+    return '<li class="ex-row'+(done?' done':'')+'">'+
+      '<span class="ex-num">'+(i+1)+'</span>'+
+      '<span><span class="ex-name">'+ex.n+'</span><br><span class="ex-area">'+ex.a+'</span></span>'+
+      '<a class="ex-video" href="'+ytUrl(ex.v)+'" target="_blank" rel="noopener">'+
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg> Video</a>'+
+    '</li>';
+  }).join("");
+
+  el.innerHTML =
+    '<div class="hero-top">'+
+      '<div class="hero-daylabel"><span class="hero-day">'+d.label+'</span><span class="hero-date">'+shortDate(today)+(done?' · Đã hoàn thành':'')+'</span></div>'+
+      '<div class="hero-focus">'+d.focus+'</div>'+
+      '<div class="hero-muscles">'+d.muscles+'</div>'+
+      '<div class="hero-meta">'+
+        '<div class="meta-item"><span class="v tnum">~'+estDuration(stage)+' phút</span><span class="l">Thời lượng ước tính</span></div>'+
+        '<div class="meta-item"><span class="v tnum">'+stage.rounds+' vòng</span><span class="l">Số vòng</span></div>'+
+        '<div class="meta-item"><span class="v tnum">'+stage.work+'s / '+stage.rest+'s</span><span class="l">Tập / Nghỉ</span></div>'+
+      '</div>'+
+      '<ul class="ex-list">'+rows+'</ul>'+
+    '</div>'+
+    '<div class="hero-actions">'+
+      (done
+        ? '<button class="btn btn-secondary" disabled>✓ Đã hoàn thành hôm nay</button>'+
+          '<button class="btn-ghost-sm" id="btnResetToday" type="button">Đặt lại</button>'
+        : '<button class="btn btn-primary" id="btnStartTimer">▶ Bắt đầu buổi tập</button>'+
+          '<button class="btn btn-secondary" id="btnMarkDone">Đánh dấu đã tập (không dùng đồng hồ)</button>'
+      )+
+      '<span class="stage-note">'+stage.label+'</span>'+
+    '</div>'+
+    '<div class="habit-wrap">'+
+      '<div class="habit-title">Thói quen bổ trợ hôm nay</div>'+
+      '<div class="habit-grid" id="habitGrid"></div>'+
+    '</div>';
+
+  renderHabitChips(document.getElementById("habitGrid"), TODAY_ISO);
+  var b1=document.getElementById("btnStartTimer");
+  if(b1) b1.addEventListener("click", function(){ openTimer(key, stage); });
+  var b2=document.getElementById("btnMarkDone");
+  if(b2) b2.addEventListener("click", function(){ promptFinishSession(key, estDuration(stage)); });
+  var b3=document.getElementById("btnResetToday");
+  if(b3) b3.addEventListener("click", function(){
+    if(!window.confirm("Đặt lại trạng thái buổi tập hôm nay? Bạn sẽ cần đánh dấu hoàn thành lại từ đầu.")) return;
+    var sess = state.sessions[TODAY_ISO];
+    if(sess){
+      sess.completed = false;
+      sess.exercisesDone = 0;
+      sess.durationMin = null;
+      sess.rpe = null;
+      saveSession(sess);
+    }
+    renderAll();
+  });
+}
+
+function renderHabitChips(container, iso){
+  var sess = state.sessions[iso] || {};
+  var habits = sess.habits || {};
+  container.innerHTML = HABITS_DEF.map(function(h){
+    var on = !!habits[h.k];
+    return '<button type="button" class="habit-chip'+(on?' on':'')+'" data-k="'+h.k+'">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m5 12 5 5L20 7"/></svg>'+
+      h.l+'</button>';
+  }).join("");
+  Array.prototype.forEach.call(container.querySelectorAll(".habit-chip"), function(btn){
+    btn.addEventListener("click", function(){
+      toggleHabit(iso, btn.getAttribute("data-k"));
+    });
+  });
+}
+
+function toggleHabit(iso, key){
+  var sess = state.sessions[iso] || makeEmptySession(iso);
+  sess.habits = sess.habits || {};
+  sess.habits[key] = !sess.habits[key];
+  state.sessions[iso] = sess;
+  saveSession(sess);
+  renderHero();
+  renderKPI();
+  renderBadges();
+}
+
+function makeEmptySession(iso){
+  var key = dayKeyFor(parseISO(iso));
+  var d = key ? PROGRAM[key] : null;
+  return {
+    date: iso, dayKey:key, focus: d?d.focus:"Cuối tuần",
+    completed:false, exercisesDone:0, exercisesTotal: d?d.exercises.length:0,
+    durationMin:null, rpe:null, weightKg:null, note:"", habits:{}, demo:false
+  };
+}
+
+/* ================= TIMER ================= */
+var timer = { running:false, key:null, plan:[], idx:0, remaining:0, handle:null, stage:null };
+
+function buildTimerPlan(key, stage){
+  var ex = PROGRAM[key].exercises;
+  var plan = [{type:"warmup", label:"Khởi động", name:"Xoay khớp, khởi động nhẹ", area:"Cổ tay, vai, hông, gối, cổ chân · jumping jack nhẹ", secs:120}];
+  for(var r=0; r<stage.rounds; r++){
+    for(var i=0; i<ex.length; i++){
+      plan.push({type:"work", label:"Tập — Vòng "+(r+1)+"/"+stage.rounds, name:ex[i].n, area:ex[i].a, video:ex[i].v, secs:stage.work});
+      var isLast = (r===stage.rounds-1) && (i===ex.length-1);
+      if(!isLast) plan.push({type:"rest", label:"Nghỉ", name:"Hít thở, thả lỏng", area:"Sắp tới: "+ (i+1<ex.length? ex[i+1].n : "Vòng tiếp theo"), secs:stage.rest});
+    }
+  }
+  plan.push({type:"cooldown", label:"Giãn cơ / Hồi phục", name:"Giãn cơ tĩnh, hít thở sâu", area:"", secs:120});
+  return plan;
+}
+
+function openTimer(key, stage){
+  timer.key = key; timer.stage = stage;
+  timer.plan = buildTimerPlan(key, stage);
+  timer.idx = 0;
+  timer.remaining = timer.plan[0].secs;
+  timer.running = true;
+  document.getElementById("timerOverlay").hidden = false;
+  document.getElementById("btnTimerPause").textContent = "Tạm dừng";
+  renderTimerFrame();
+  tick();
+}
+function closeTimer(){
+  clearTimeout(timer.handle);
+  timer.running = false;
+  document.getElementById("timerOverlay").hidden = true;
+  var vf = document.getElementById("timerVideoFrame");
+  if(vf){ vf.src=""; }
+  var vw = document.getElementById("timerVideoWrap");
+  if(vw){ vw.hidden = true; vw.removeAttribute("data-cur"); }
+}
+function buildVideoEmbedUrl(id){
+  var params = "autoplay=1&mute=1&playsinline=1&rel=0";
+  if(location.protocol !== "file:"){
+    params += "&origin="+encodeURIComponent(location.origin);
+  }
+  return "https://www.youtube.com/embed/"+id+"?"+params;
+}
+function tick(){
+  clearTimeout(timer.handle);
+  if(!timer.running) return;
+  timer.handle = setTimeout(function(){
+    timer.remaining -= 1;
+    if(timer.remaining < 0){
+      var finishedStep = timer.plan[timer.idx];
+      timer.idx += 1;
+      if(timer.idx >= timer.plan.length){
+        finishTimerFlow();
+        return;
+      }
+      beep(timer.plan[timer.idx].type==="work" ? 880 : 440);
+      timer.remaining = timer.plan[timer.idx].secs;
+    }
+    renderTimerFrame();
+    tick();
+  }, 1000);
+}
+function skipStep(){
+  timer.idx += 1;
+  if(timer.idx >= timer.plan.length){ finishTimerFlow(); return; }
+  timer.remaining = timer.plan[timer.idx].secs;
+  renderTimerFrame();
+}
+function togglePause(){
+  timer.running = !timer.running;
+  document.getElementById("btnTimerPause").textContent = timer.running ? "Tạm dừng" : "Tiếp tục";
+  if(timer.running) tick(); else clearTimeout(timer.handle);
+}
+function renderTimerFrame(){
+  var step = timer.plan[timer.idx];
+  var m = Math.floor(Math.max(timer.remaining,0)/60), s = Math.max(timer.remaining,0)%60;
+  document.getElementById("timerNum").textContent = m+":"+pad2(s);
+  document.getElementById("timerExName").textContent = step.name;
+  document.getElementById("timerExArea").textContent = step.area||"";
+  var videoWrap = document.getElementById("timerVideoWrap");
+  var videoFrame = document.getElementById("timerVideoFrame");
+  var videoLink = document.getElementById("timerVideoLink");
+  if(step.video && step.type==="work"){
+    if(videoWrap.getAttribute("data-cur") !== step.video){
+      videoWrap.setAttribute("data-cur", step.video);
+      videoFrame.src = buildVideoEmbedUrl(step.video);
+      videoLink.href = "https://www.youtube.com/watch?v="+step.video;
+    }
+    videoWrap.hidden = false;
+  } else if(!videoWrap.hidden){
+    videoWrap.hidden = true;
+    videoWrap.removeAttribute("data-cur");
+    videoFrame.src = "";
+  }
+  var phaseEl = document.getElementById("timerPhase");
+  phaseEl.textContent = step.label.toUpperCase();
+  phaseEl.className = "timer-phase" + (step.type==="work"?" work":step.type==="rest"?" rest":"");
+  var next = timer.plan[timer.idx+1];
+  document.getElementById("timerNext").textContent = next ? ("Tiếp theo: "+next.name) : "Bước cuối cùng";
+  document.getElementById("timerRound").textContent = step.type==="work"||step.type==="rest" ? step.label : step.label;
+  var bar = document.getElementById("timerRingBar");
+  var R = 96, C = 2*Math.PI*R;
+  var frac = step.secs>0 ? Math.max(0,timer.remaining)/step.secs : 0;
+  bar.setAttribute("stroke-dasharray", C.toFixed(1));
+  bar.setAttribute("stroke-dashoffset", (C*(1-frac)).toFixed(1));
+  bar.classList.toggle("rest", step.type==="rest");
+}
+function beep(freq){
+  try{
+    var Ctx = window.AudioContext || window.webkitAudioContext;
+    if(!Ctx) return;
+    var ctx = beep._ctx || (beep._ctx = new Ctx());
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = "sine"; o.frequency.value = freq;
+    g.gain.value = 0.001;
+    o.connect(g); g.connect(ctx.destination);
+    var t0 = ctx.currentTime;
+    g.gain.exponentialRampToValueAtTime(0.18, t0+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.28);
+    o.start(t0); o.stop(t0+0.3);
+  }catch(e){}
+}
+function finishTimerFlow(){
+  closeTimer();
+  var stage = timer.stage;
+  promptFinishSession(timer.key, estDuration(stage));
+}
+
+/* ================= FINISH SESSION FLOW ================= */
+function promptFinishSession(key, defaultDuration){
+  var durStr = window.prompt("Thời gian tập thực tế (phút)?", String(defaultDuration));
+  if(durStr===null) return;
+  var rpeStr = window.prompt("Mức gắng sức RPE (1–10)? Để trống nếu bỏ qua.", "6");
+  var weightStr = window.prompt("Cân nặng sáng nay (kg)? Để trống nếu không cân hôm nay.", "");
+  var sess = state.sessions[TODAY_ISO] || makeEmptySession(TODAY_ISO);
+  sess.completed = true;
+  sess.exercisesDone = sess.exercisesTotal || (PROGRAM[key]?PROGRAM[key].exercises.length:6);
+  sess.durationMin = durStr ? Number(durStr) : defaultDuration;
+  sess.rpe = rpeStr ? Number(rpeStr) : null;
+  if(weightStr){ sess.weightKg = Number(weightStr); }
+  sess.demo = false;
+  state.sessions[TODAY_ISO] = sess;
+  saveSession(sess);
+  renderAll();
+}
+
+/* ================= RPE EXPLANATION (inline help, no modal needed) ================= */
+// RPE (Rate of Perceived Exertion) 1-10: 1-2 rất nhẹ, 5-6 vừa (còn nói chuyện được),
+// 7-8 khó (nói ngắt quãng), 9 gần kiệt sức, 10 tối đa. Ghi RPE cuối mỗi buổi giúp
+// nhận biết khi nào cần tăng độ khó (RPE liên tục <=5) hoặc cần nghỉ (RPE >=9 nhiều buổi liền).
+
+/* ================= KPI ================= */
+function last7Sessions(){
+  var arr=[];
+  for(var i=0;i<7;i++){ arr.push(isoDate(addDays(today,-i))); }
+  return arr;
+}
+function computeStreak(){
+  var streak=0, d=new Date(today);
+  // if today not completed yet, start counting from yesterday
+  var s = state.sessions[isoDate(d)];
+  if(!(s && s.completed)){ d = addDays(d,-1); }
+  while(true){
+    var dk = dayKeyFor(d);
+    if(dk===null){ d = addDays(d,-1); continue; } // skip weekends silently
+    var iso = isoDate(d);
+    var sess = state.sessions[iso];
+    if(sess && sess.completed){ streak++; d = addDays(d,-1); }
+    else break;
+  }
+  return streak;
+}
+function adherence7d(){
+  var planned=0, done=0;
+  for(var i=0;i<7;i++){
+    var d = addDays(today,-i);
+    if(dayKeyFor(d)===null) continue;
+    if(isoDate(d)===TODAY_ISO) continue; // today not due yet
+    planned++;
+    var sess = state.sessions[isoDate(d)];
+    if(sess && sess.completed) done++;
+  }
+  return planned>0 ? Math.round(100*done/planned) : null;
+}
+function allWeightPoints(){
+  var pts=[];
+  Object.keys(state.sessions).sort().forEach(function(iso){
+    var s = state.sessions[iso];
+    if(s && s.weightKg!=null) pts.push({date:iso, kg:s.weightKg});
+  });
+  return pts;
+}
+function totalCompleted(){
+  var n=0;
+  Object.keys(state.sessions).forEach(function(k){ if(state.sessions[k].completed) n++; });
+  return n;
+}
+function renderKPI(){
+  var streak = computeStreak();
+  document.getElementById("streakVal").textContent = streak;
+  var adh = adherence7d();
+  var wpts = allWeightPoints();
+  var wChange = wpts.length>=1 ? (wpts[wpts.length-1].kg - state.settings.startWeightKg) : null;
+  var total = totalCompleted();
+
+  var cards = [
+    {l:"Chuỗi hiện tại", v:streak, unit:"buổi", trend:null},
+    {l:"Tuân thủ 7 ngày", v: adh==null?"—":adh, unit: adh==null?"":"%", trend:null},
+    {l:"Thay đổi cân nặng", v: wChange==null? "—" : (wChange>0?"+":"")+fmtKg(wChange), unit: wChange==null?"":"kg",
+      trend: wChange==null?null:(wChange<0?"pos":wChange>0?"neg":"flat")},
+    {l:"Tổng số buổi", v: total, unit:"buổi", trend:null}
+  ];
+  document.getElementById("kpiGrid").innerHTML = cards.map(function(c){
+    return '<div class="kpi"><span class="l">'+c.l+'</span>'+
+      '<span class="v tnum">'+c.v+(c.unit?'<small>'+c.unit+'</small>':'')+'</span>'+
+      (c.trend? '<span class="trend '+c.trend+'">'+(c.trend==="pos"?"↓ đang giảm":c.trend==="neg"?"↑ đang tăng":"không đổi")+'</span>':'')+
+    '</div>';
+  }).join("");
+}
+
+/* ================= CHARTS (inline SVG, per dataviz spec) ================= */
+function svgEl(tag, attrs){
+  var el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  for(var k in attrs) el.setAttribute(k, attrs[k]);
+  return el;
+}
+function cssVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+function renderWeightChart(){
+  var box = document.getElementById("weightChartBox");
+  var pts = allWeightPoints();
+  if(pts.length===0){
+    box.innerHTML = '<div class="chart-empty">Chưa có dữ liệu cân nặng — ghi cân sau khi hoàn thành buổi tập.</div>';
+    return;
+  }
+  var W=520,H=260,padL=40,padR=16,padT=16,padB=30;
+  var kgs = pts.map(function(p){return p.kg;}).concat([state.settings.targetWeightKg]);
+  var minK = Math.floor(Math.min.apply(null,kgs)-1), maxK = Math.ceil(Math.max.apply(null,kgs)+1);
+  function x(i){ return padL + (pts.length<=1?0:(i/(pts.length-1))*(W-padL-padR)); }
+  function y(v){ return padT + (1-(v-minK)/(maxK-minK))*(H-padT-padB); }
+
+  var accent2 = cssVar("--accent-2") || "#2FA39D";
+  var muted = cssVar("--text-faint") || "#7A6C60";
+  var textc = cssVar("--text-muted") || "#AFA093";
+  var border = cssVar("--border") || "#3D342C";
+
+  var svg = svgEl("svg",{viewBox:"0 0 "+W+" "+H, "aria-label":"Biểu đồ xu hướng cân nặng"});
+
+  // gridlines (3)
+  for(var g=0; g<=2; g++){
+    var gv = minK + (maxK-minK)*g/2;
+    var gy = y(gv);
+    svg.appendChild(svgEl("line",{x1:padL,x2:W-padR,y1:gy,y2:gy,stroke:border,"stroke-width":1}));
+    var lbl = svgEl("text",{x:4,y:gy+4,"font-size":10,fill:textc,"font-family":"'JetBrains Mono',monospace"});
+    lbl.textContent = gv+"kg"; svg.appendChild(lbl);
+  }
+  // target reference line
+  var ty = y(state.settings.targetWeightKg);
+  var tline = svgEl("line",{x1:padL,x2:W-padR,y1:ty,y2:ty,stroke:muted,"stroke-width":1,"stroke-dasharray":"3,4"});
+  svg.appendChild(tline);
+  var tlabel = svgEl("text",{x:W-padR,y:ty-5,"font-size":10,fill:muted,"text-anchor":"end"});
+  tlabel.textContent = "Mục tiêu "+state.settings.targetWeightKg+"kg";
+  svg.appendChild(tlabel);
+
+  // line path
+  var d = pts.map(function(p,i){ return (i===0?"M":"L")+x(i).toFixed(1)+","+y(p.kg).toFixed(1); }).join(" ");
+  svg.appendChild(svgEl("path",{d:d, fill:"none", stroke:accent2, "stroke-width":2, "stroke-linejoin":"round","stroke-linecap":"round"}));
+
+  var dotGroup = svgEl("g",{});
+  pts.forEach(function(p,i){
+    var c = svgEl("circle",{cx:x(i),cy:y(p.kg),r:i===pts.length-1?4.5:3,fill:accent2, stroke: (cssVar("--surface")||"#241E19"), "stroke-width":1.5, "data-i":i});
+    dotGroup.appendChild(c);
+  });
+  svg.appendChild(dotGroup);
+
+  // direct label on last point only
+  var last = pts[pts.length-1];
+  var llabel = svgEl("text",{x:x(pts.length-1), y:y(last.kg)-10, "font-size":12,"font-weight":700, fill:accent2, "text-anchor":"end","font-family":"'JetBrains Mono',monospace"});
+  llabel.textContent = fmtKg(last.kg)+"kg";
+  svg.appendChild(llabel);
+
+  // x labels: first, middle, last
+  [0, Math.floor((pts.length-1)/2), pts.length-1].forEach(function(i){
+    var t = svgEl("text",{x:x(i),y:H-8,"font-size":10, fill:textc, "text-anchor":"middle"});
+    t.textContent = shortDate(parseISO(pts[i].date));
+    svg.appendChild(t);
+  });
+
+  box.innerHTML = "";
+  box.appendChild(svg);
+  attachTooltip(box, svg, dotGroup, function(el){
+    var i = +el.getAttribute("data-i");
+    var p = pts[i];
+    return shortDate(parseISO(p.date))+" — <b>"+fmtKg(p.kg)+" kg</b>";
+  });
+}
+
+function weeklyAdherenceData(){
+  // last 8 ISO-ish weeks (Mon-Fri), most recent last, clamped to program start date
+  var weeks=[];
+  var mondayThis = addDays(today, -((dowIndex(today)+6)%7));
+  var startD = parseISO(state.settings.startDate || TODAY_ISO);
+  for(var w=7; w>=0; w--){
+    var mon = addDays(mondayThis, -7*w);
+    var planned=0, done=0;
+    for(var i=0;i<5;i++){
+      var d = addDays(mon,i);
+      if(d>today || d<startD) continue;
+      planned++;
+      var sess = state.sessions[isoDate(d)];
+      if(sess && sess.completed) done++;
+    }
+    weeks.push({label:"T"+shortDate(mon).replace("/","."), planned:planned, done:done, pct: planned>0?Math.round(100*done/planned):null});
+  }
+  return weeks.filter(function(wk){ return wk.planned>0; });
+}
+
+function renderAdherenceChart(){
+  var box = document.getElementById("adherenceChartBox");
+  var weeks = weeklyAdherenceData();
+  if(weeks.length===0){
+    box.innerHTML = '<div class="chart-empty">Chưa có dữ liệu tuần nào.</div>';
+    return;
+  }
+  var W=520,H=260,padL=34,padR=10,padT=16,padB=30;
+  var accent = cssVar("--accent") || "#E8622A";
+  var textc = cssVar("--text-muted") || "#AFA093";
+  var border = cssVar("--border") || "#3D342C";
+  var n = weeks.length;
+  var gap = 10;
+  var bw = (W-padL-padR-gap*(n-1))/n;
+  function y(pct){ return padT + (1-pct/100)*(H-padT-padB); }
+
+  var svg = svgEl("svg",{viewBox:"0 0 "+W+" "+H,"aria-label":"Biểu đồ tuân thủ theo tuần"});
+  [0,50,100].forEach(function(v){
+    var gy=y(v);
+    svg.appendChild(svgEl("line",{x1:padL,x2:W-padR,y1:gy,y2:gy,stroke:border,"stroke-width":1}));
+    var t = svgEl("text",{x:4,y:gy+4,"font-size":10,fill:textc});
+    t.textContent=v+"%"; svg.appendChild(t);
+  });
+  var barGroup = svgEl("g",{});
+  weeks.forEach(function(wk,i){
+    var bx = padL + i*(bw+gap);
+    var by = y(wk.pct);
+    var bh = (H-padB)-by;
+    var rect = svgEl("rect",{x:bx,y:by,width:bw,height:Math.max(bh,1),fill:accent,rx:3,"data-i":i});
+    barGroup.appendChild(rect);
+    var lbl = svgEl("text",{x:bx+bw/2,y:H-8,"font-size":10,fill:textc,"text-anchor":"middle"});
+    lbl.textContent = wk.label; svg.appendChild(lbl);
+    if(i===weeks.length-1){
+      var vlabel = svgEl("text",{x:bx+bw/2,y:by-6,"font-size":11,"font-weight":700,fill:accent,"text-anchor":"middle","font-family":"'JetBrains Mono',monospace"});
+      vlabel.textContent = wk.pct+"%"; svg.appendChild(vlabel);
+    }
+  });
+  svg.appendChild(barGroup);
+  box.innerHTML="";
+  box.appendChild(svg);
+  attachTooltip(box, svg, barGroup, function(el){
+    var i=+el.getAttribute("data-i"); var wk=weeks[i];
+    return wk.label+" — <b>"+wk.done+"/"+wk.planned+"</b> buổi ("+wk.pct+"%)";
+  });
+}
+
+function attachTooltip(box, svg, group, textFn){
+  var tip = document.createElement("div");
+  tip.className="tooltip";
+  box.style.position="relative";
+  box.appendChild(tip);
+  Array.prototype.forEach.call(group.children, function(el){
+    el.addEventListener("mouseenter", function(evt){ show(el, evt); });
+    el.addEventListener("mousemove", function(evt){ show(el, evt); });
+    el.addEventListener("mouseleave", function(){ tip.classList.remove("show"); });
+    el.addEventListener("touchstart", function(evt){ show(el, evt); }, {passive:true});
+  });
+  function show(el, evt){
+    tip.innerHTML = textFn(el);
+    var rect = box.getBoundingClientRect();
+    var cx, cy;
+    if(evt.touches && evt.touches[0]){ cx=evt.touches[0].clientX-rect.left; cy=evt.touches[0].clientY-rect.top; }
+    else { cx=evt.clientX-rect.left; cy=evt.clientY-rect.top; }
+    tip.style.left=cx+"px"; tip.style.top=cy+"px";
+    tip.classList.add("show");
+  }
+}
+
+/* ================= HISTORY TABLE ================= */
+function renderHistory(){
+  var isos = Object.keys(state.sessions).sort().reverse().slice(0,14);
+  var body = document.getElementById("historyBody");
+  if(isos.length===0){
+    body.innerHTML = '<tr><td colspan="7" class="chart-empty">Chưa có buổi tập nào được ghi nhận.</td></tr>';
+    return;
+  }
+  body.innerHTML = isos.map(function(iso){
+    var s = state.sessions[iso];
+    var d = parseISO(iso);
+    return "<tr>"+
+      "<td class=\"tnum\">"+shortDate(d)+"</td>"+
+      "<td>"+(s.focus||"—")+"</td>"+
+      "<td>"+(s.completed? '<span class="pill good">✓ Hoàn thành</span>' : '<span class="pill miss">Chưa tập</span>')+"</td>"+
+      "<td class=\"tnum\">"+(s.durationMin!=null? s.durationMin+" phút":"—")+"</td>"+
+      "<td class=\"tnum\">"+(s.rpe!=null? s.rpe:"—")+"</td>"+
+      "<td class=\"tnum\">"+(s.weightKg!=null? fmtKg(s.weightKg)+" kg":"—")+"</td>"+
+      "<td class=\"row-note\">"+(s.note||"")+"</td>"+
+    "</tr>";
+  }).join("");
+}
+
+/* ================= BADGES ================= */
+var BADGE_DEFS = [
+  {k:"first", n:"Buổi Đầu Tiên", d:"Hoàn thành 1 buổi tập", icon:"M12 2l2.5 6.5L21 10l-5 4.5L17.5 21 12 17l-5.5 4L8 14.5 3 10l6.5-1.5z",
+    test:function(){ return totalCompleted()>=1; }},
+  {k:"streak5", n:"Chuỗi 5 Buổi", d:"5 buổi liên tiếp không bỏ", icon:"M12 2c1 3-1 4.5-2.5 6C7.8 9.8 7 11.5 7 13.5 7 17.6 9.7 20 12 20s5-2.2 5-6c0-2-.9-3.2-1.7-4.3.3 1.6-.4 2.6-1.1 2.6-.9 0-1.2-.9-.9-1.8.6-1.8.2-4.8-1.3-8.5z",
+    test:function(){ return computeStreak()>=5; }},
+  {k:"streak10", n:"Chuỗi 10 Buổi", d:"10 buổi liên tiếp không bỏ", icon:"M12 2c1 3-1 4.5-2.5 6C7.8 9.8 7 11.5 7 13.5 7 17.6 9.7 20 12 20s5-2.2 5-6c0-2-.9-3.2-1.7-4.3.3 1.6-.4 2.6-1.1 2.6-.9 0-1.2-.9-.9-1.8.6-1.8.2-4.8-1.3-8.5z",
+    test:function(){ return computeStreak()>=10; }},
+  {k:"week1", n:"Tuần Đầu Tiên", d:"5/5 buổi trong 1 tuần", icon:"M4 4h16v4H4zM4 10h16v10H4z",
+    test:function(){ var wks=weeklyAdherenceData(); return wks.some(function(w){return w.planned===5&&w.done===5;}); }},
+  {k:"kg1", n:"Giảm 1kg", d:"So với cân nặng khởi điểm", icon:"M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z",
+    test:function(){ var p=allWeightPoints(); return p.length&&(state.settings.startWeightKg-p[p.length-1].kg)>=1; }},
+  {k:"kg5", n:"Giảm 5kg", d:"So với cân nặng khởi điểm", icon:"M12 2l7 4v6c0 5-3.5 8.5-7 10-3.5-1.5-7-5-7-10V6z",
+    test:function(){ var p=allWeightPoints(); return p.length&&(state.settings.startWeightKg-p[p.length-1].kg)>=5; }},
+  {k:"consistent", n:"Nhất Quán", d:"Tuân thủ 7 ngày ≥ 80%", icon:"m5 12 5 5L20 7",
+    test:function(){ var a=adherence7d(); return a!=null && a>=80; }}
+];
+function renderBadges(){
+  document.getElementById("badgeGrid").innerHTML = BADGE_DEFS.map(function(b){
+    var earned = b.test();
+    return '<div class="badge'+(earned?' earned':'')+'">'+
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="'+b.icon+'"/></svg>'+
+      '<div class="n">'+b.n+'</div><div class="d">'+b.d+'</div></div>';
+  }).join("");
+}
+
+/* ================= FEEDBACK ================= */
+function renderRateButtons(){
+  var wrap = document.getElementById("fbRate");
+  var html="";
+  for(var i=1;i<=10;i++){
+    html += '<button type="button" class="rate-btn'+(state.fbRating===i?' sel':'')+'" data-v="'+i+'">'+i+'</button>';
+  }
+  wrap.innerHTML = html;
+  Array.prototype.forEach.call(wrap.querySelectorAll(".rate-btn"), function(btn){
+    btn.addEventListener("click", function(){
+      state.fbRating = +btn.getAttribute("data-v");
+      renderRateButtons();
+    });
+  });
+}
+function renderFeedbackHistory(){
+  var list = state.feedback.slice().sort(function(a,b){ return (b.weekStart||"").localeCompare(a.weekStart||""); });
+  var el = document.getElementById("fbHistory");
+  if(list.length===0){ el.innerHTML = '<div class="chart-empty">Chưa có feedback nào.</div>'; return; }
+  el.innerHTML = list.map(function(f){
+    return '<div class="fb-item">'+
+      '<div class="hd"><span>Tuần bắt đầu '+shortDate(parseISO(f.weekStart))+'</span><b>'+(f.satisfaction!=null?f.satisfaction+"/10":"—")+'</b></div>'+
+      (f.whatWorked? '<div class="lbl">Hiệu quả</div><p>'+escapeHtml(f.whatWorked)+'</p>':'')+
+      (f.whatToImprove? '<div class="lbl">Cần cải thiện</div><p>'+escapeHtml(f.whatToImprove)+'</p>':'')+
+      (f.changeNextWeek? '<div class="lbl">Thay đổi tuần sau</div><p>'+escapeHtml(f.changeNextWeek)+'</p>':'')+
+    '</div>';
+  }).join("");
+}
+function escapeHtml(s){ var d=document.createElement("div"); d.textContent=s||""; return d.innerHTML; }
+
+document.getElementById("fbForm").addEventListener("submit", function(e){
+  e.preventDefault();
+  var mondayThis = addDays(today, -((dowIndex(today)+6)%7));
+  var doc = {
+    weekStart: isoDate(mondayThis),
+    whatWorked: document.getElementById("fbWorked").value.trim(),
+    whatToImprove: document.getElementById("fbImprove").value.trim(),
+    changeNextWeek: document.getElementById("fbChange").value.trim(),
+    satisfaction: state.fbRating,
+    demo:false,
+    createdAt: Date.now()
+  };
+  state.feedback.push(doc);
+  saveFeedback(doc);
+  document.getElementById("fbForm").reset();
+  state.fbRating=null;
+  renderRateButtons();
+  renderFeedbackHistory();
+});
+
+/* ================= REFERENCE PANEL ================= */
+function renderReference(){
+  document.getElementById("foodGrid").innerHTML = FOOD_REF.map(function(r){
+    return '<div class="food-card"><div class="g">'+r[0]+'</div><div class="f">'+r[1]+'</div><div class="w">'+r[2]+'</div></div>';
+  }).join("");
+  document.getElementById("tipsList").innerHTML = TIPS_REF.map(function(t){ return "<li>"+t+"</li>"; }).join("");
+}
+
+/* ================= QUOTE ================= */
+function renderQuote(){
+  var dayNum = Math.floor(parseISO(TODAY_ISO).getTime()/86400000);
+  var q = QUOTES[dayNum % QUOTES.length];
+  document.getElementById("quoteText").textContent = "“"+q[0]+"”";
+  document.getElementById("quoteSrc").textContent = "NHỊP · động lực mỗi ngày";
+}
+
+/* ================= SETTINGS MODAL ================= */
+function openSettings(){
+  document.getElementById("setStartW").value = state.settings.startWeightKg;
+  document.getElementById("setTargetW").value = state.settings.targetWeightKg;
+  document.getElementById("setStartDate").value = state.settings.startDate;
+  document.getElementById("setWeek").value = state.settings.currentWeek;
+  document.getElementById("settingsOverlay").hidden = false;
+}
+document.getElementById("btnSettings").addEventListener("click", openSettings);
+document.getElementById("btnCancelSettings").addEventListener("click", function(){ document.getElementById("settingsOverlay").hidden = true; });
+document.getElementById("btnSaveSettings").addEventListener("click", function(){
+  state.settings.startWeightKg = Number(document.getElementById("setStartW").value)||state.settings.startWeightKg;
+  state.settings.targetWeightKg = Number(document.getElementById("setTargetW").value)||state.settings.targetWeightKg;
+  state.settings.startDate = document.getElementById("setStartDate").value || state.settings.startDate;
+  state.settings.currentWeek = Number(document.getElementById("setWeek").value)||state.settings.currentWeek;
+  saveSettings();
+  document.getElementById("settingsOverlay").hidden = true;
+  renderAll();
+});
+
+/* ================= TIMER WIRES ================= */
+document.getElementById("btnCloseTimer").addEventListener("click", closeTimer);
+document.getElementById("btnTimerSkip").addEventListener("click", skipStep);
+document.getElementById("btnTimerPause").addEventListener("click", togglePause);
+document.getElementById("timerVideoRetry").addEventListener("click", function(){
+  var vw = document.getElementById("timerVideoWrap");
+  var id = vw.getAttribute("data-cur");
+  if(!id) return;
+  var vf = document.getElementById("timerVideoFrame");
+  vf.src = "";
+  setTimeout(function(){ vf.src = buildVideoEmbedUrl(id) + "&_r=" + Date.now(); }, 50);
+});
+
+/* ================= RENDER ALL ================= */
+function renderAll(){
+  renderHero();
+  renderKPI();
+  renderWeightChart();
+  renderAdherenceChart();
+  renderHistory();
+  renderBadges();
+  renderFeedbackHistory();
+}
+
+/* ================= LOCAL STORAGE PERSISTENCE (bản offline — dữ liệu lưu ngay trên trình duyệt này) ================= */
+var STORAGE_KEY = "nhip_workout_data_v1";
+var hasDemoData = false;
+
+function checkDemoBanner(){
+  var demo = Object.keys(state.sessions).some(function(k){return state.sessions[k].demo;})
+    || state.feedback.some(function(f){return f.demo;});
+  document.getElementById("demoBanner").hidden = !demo;
+  hasDemoData = demo;
+}
+
+function persistLocal(){
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      sessions: state.sessions,
+      feedback: state.feedback,
+      settings: state.settings
+    }));
+  }catch(e){ /* private mode / storage blocked — app still works, just won't remember on reload */ }
+}
+function saveSession(sess){ persistLocal(); }
+function saveFeedback(doc){ persistLocal(); }
+function saveSettings(){ persistLocal(); }
+
+/* Dữ liệu mẫu minh hoạ — chỉ nạp lần đầu mở app (khi chưa có dữ liệu nào trong trình duyệt) */
+var DEMO_SESSIONS = {
+"2026-08-24": {"date":"2026-08-24","dayKey":"t2","focus":"Đẩy (Push) + Core","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":15,"rpe":6,"weightKg":95,"note":"Buổi đầu, còn hơi gượng nhưng hoàn thành đủ.","habits":{"protein":true,"sleep":true,"water":true,"move":false,"noAlcohol":true,"weighed":true},"demo":true},
+"2026-08-25": {"date":"2026-08-25","dayKey":"t3","focus":"Thân dưới (Lower Body)","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":14,"rpe":6,"weightKg":null,"note":"Squat với lunge ổn, chưa quen single-leg deadlift.","habits":{"protein":true,"sleep":false,"water":true,"move":false,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-08-26": {"date":"2026-08-26","dayKey":"t4","focus":"Kéo (Pull) + Lưng/Vai sau","completed":false,"exercisesDone":0,"exercisesTotal":6,"durationMin":null,"rpe":null,"weightKg":null,"note":"Bận việc, bỏ buổi.","habits":{"protein":false,"sleep":false,"water":true,"move":false,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-08-27": {"date":"2026-08-27","dayKey":"t5","focus":"Sức bền/Cardio (Conditioning)","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":13,"rpe":7,"weightKg":null,"note":"Cardio khá mệt, high knees làm hụt hơi.","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-08-28": {"date":"2026-08-28","dayKey":"t6","focus":"Toàn thân tổng hợp","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":15,"rpe":6,"weightKg":null,"note":"Buổi tổng hợp cuối tuần đầu, thấy khá hơn Thứ 2.","habits":{"protein":true,"sleep":true,"water":true,"move":false,"noAlcohol":true,"weighed":true},"demo":true},
+"2026-08-31": {"date":"2026-08-31","dayKey":"t2","focus":"Đẩy (Push) + Core","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":14,"rpe":5,"weightKg":94.3,"note":"Push-up đỡ run tay hơn tuần trước.","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":true},"demo":true},
+"2026-09-01": {"date":"2026-09-01","dayKey":"t3","focus":"Thân dưới (Lower Body)","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":14,"rpe":6,"weightKg":null,"note":"","habits":{"protein":true,"sleep":true,"water":true,"move":false,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-09-02": {"date":"2026-09-02","dayKey":"t4","focus":"Kéo (Pull) + Lưng/Vai sau","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":13,"rpe":5,"weightKg":null,"note":"Superman và bird-dog thấy ổn định hơn.","habits":{"protein":true,"sleep":true,"water":true,"move":false,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-09-03": {"date":"2026-09-03","dayKey":"t5","focus":"Sức bền/Cardio (Conditioning)","completed":false,"exercisesDone":0,"exercisesTotal":6,"durationMin":null,"rpe":null,"weightKg":null,"note":"Mệt, bỏ tập.","habits":{"protein":false,"sleep":false,"water":true,"move":false,"noAlcohol":false,"weighed":false},"demo":true},
+"2026-09-04": {"date":"2026-09-04","dayKey":"t6","focus":"Toàn thân tổng hợp","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":15,"rpe":6,"weightKg":null,"note":"","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":true},"demo":true},
+"2026-09-07": {"date":"2026-09-07","dayKey":"t2","focus":"Đẩy (Push) + Core","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":14,"rpe":6,"weightKg":93.6,"note":"Bắt đầu tuần 3, tăng lên 45s tập/15s nghỉ.","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":true},"demo":true},
+"2026-09-08": {"date":"2026-09-08","dayKey":"t3","focus":"Thân dưới (Lower Body)","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":14,"rpe":6,"weightKg":null,"note":"","habits":{"protein":true,"sleep":true,"water":true,"move":false,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-09-09": {"date":"2026-09-09","dayKey":"t4","focus":"Kéo (Pull) + Lưng/Vai sau","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":13,"rpe":5,"weightKg":null,"note":"","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-09-10": {"date":"2026-09-10","dayKey":"t5","focus":"Sức bền/Cardio (Conditioning)","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":14,"rpe":7,"weightKg":null,"note":"Squat jump mệt nhưng làm đủ 2 vòng.","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":false},"demo":true},
+"2026-09-11": {"date":"2026-09-11","dayKey":"t6","focus":"Toàn thân tổng hợp","completed":true,"exercisesDone":6,"exercisesTotal":6,"durationMin":15,"rpe":6,"weightKg":93.2,"note":"Tuần 3 hoàn thành 5/5 — tự tin hơn hẳn.","habits":{"protein":true,"sleep":true,"water":true,"move":true,"noAlcohol":true,"weighed":true},"demo":true}
+};
+var DEMO_FEEDBACK = [
+  {"_id":"wk-2026-08-24","weekStart":"2026-08-24","whatWorked":"Các bài chân (squat, lunge) làm tốt, không mỏi nhiều.","whatToImprove":"Push-up vòng 2 còn yếu, plank bị chùng lưng.","changeNextWeek":"Vòng 2 ngày Thứ 2 & Thứ 6 đổi push-up thường sang push-up trên đầu gối.","satisfaction":7,"demo":true},
+  {"_id":"wk-2026-09-07","weekStart":"2026-09-07","whatWorked":"Đã quen nhịp, tập đều 5/5 buổi tuần này.","whatToImprove":"Vẫn hụt hơi ở bài burpee cuối buổi Thứ 6.","changeNextWeek":"Giảm burpee còn nửa số lần ở 2 tuần đầu chuyển giai đoạn mới.","satisfaction":8,"demo":true}
+];
+var DEMO_SETTINGS = {startWeightKg:95, targetWeightKg:80, startDate:"2026-08-24", currentWeek:4};
+
+function seedDemoData(){
+  state.sessions = JSON.parse(JSON.stringify(DEMO_SESSIONS));
+  state.feedback = JSON.parse(JSON.stringify(DEMO_FEEDBACK));
+  state.settings = Object.assign({}, state.settings, DEMO_SETTINGS);
+  persistLocal();
+}
+
+function loadFromLocal(){
+  var raw = null;
+  try{ raw = localStorage.getItem(STORAGE_KEY); }catch(e){}
+  if(raw){
+    try{
+      var parsed = JSON.parse(raw);
+      state.sessions = parsed.sessions || {};
+      state.feedback = parsed.feedback || [];
+      state.settings = Object.assign({}, state.settings, parsed.settings||{});
+    }catch(e){ seedDemoData(); }
+  } else {
+    seedDemoData();
+  }
+  checkDemoBanner();
+  renderAll();
+}
+
+document.getElementById("btnClearDemo").addEventListener("click", function(){
+  var demoIsos = Object.keys(state.sessions).filter(function(k){return state.sessions[k].demo;});
+  demoIsos.forEach(function(k){ delete state.sessions[k]; });
+  state.feedback = state.feedback.filter(function(f){ return !f.demo; });
+  persistLocal();
+  checkDemoBanner();
+  renderAll();
+});
+
+/* ================= INIT ================= */
+initTheme();
+renderQuote();
+renderReference();
+renderRateButtons();
+loadFromLocal();
+
+})();
+</script>
+</body>
+</html>
