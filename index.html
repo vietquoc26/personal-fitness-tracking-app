@@ -495,7 +495,7 @@ details[open] .ref-chevron{transform:rotate(180deg);}
     </details>
   </section>
 
-  <div class="footer-note">NHỊP · bản offline — dữ liệu lưu ngay trên trình duyệt này, không đồng bộ thiết bị khác · lịch tập Thứ 2–Thứ 6, cuối tuần vận động nhẹ</div>
+  <div class="footer-note">NHỊP · <span id="syncStatus">đang kết nối đồng bộ…</span> · lịch tập Thứ 2–Thứ 6, cuối tuần vận động nhẹ</div>
 </main>
 
 <!-- SETTINGS MODAL -->
@@ -564,6 +564,30 @@ details[open] .ref-chevron{transform:rotate(180deg);}
     </div>
   </div>
 </div>
+
+<!-- Firebase (đồng bộ dữ liệu giữa các thiết bị) -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script>
+(function(){
+  "use strict";
+  var firebaseConfig = {
+    apiKey: "AIzaSyAGuaWAe-FsWHtzdq0y5dxgPKGrr5GF1Vc",
+    authDomain: "fitness-tracking-d5cf0.firebaseapp.com",
+    projectId: "fitness-tracking-d5cf0",
+    storageBucket: "fitness-tracking-d5cf0.firebasestorage.app",
+    messagingSenderId: "301242444450",
+    appId: "1:301242444450:web:2d8d66da21c7a40e09c5fb"
+  };
+  try{
+    firebase.initializeApp(firebaseConfig);
+    window.__nhipDb = firebase.firestore();
+  }catch(e){
+    console.warn("Firebase init thất bại — app vẫn chạy ở chế độ offline:", e);
+    window.__nhipDb = null;
+  }
+})();
+</script>
 
 <script>
 (function(){
@@ -1463,7 +1487,60 @@ function renderAll(){
   renderFeedbackHistory();
 }
 
-/* ================= LOCAL STORAGE PERSISTENCE (bản offline — dữ liệu lưu ngay trên trình duyệt này) ================= */
+/* ================= CLOUD SYNC (Firestore — đồng bộ giữa các thiết bị) ================= */
+var SYNC_DOC_ID = "vietquoc-nhip-8x2q";
+var syncDocRef = window.__nhipDb ? window.__nhipDb.collection("nhip_sync").doc(SYNC_DOC_ID) : null;
+var syncApplyingRemote = false; // true trong lúc đang áp dữ liệu từ cloud vào, để tránh vòng lặp ghi ngược lại cloud
+
+function setSyncStatus(text){
+  var el = document.getElementById("syncStatus");
+  if(el) el.textContent = text;
+}
+
+function syncPush(){
+  if(!syncDocRef || syncApplyingRemote) return;
+  setSyncStatus("đang đồng bộ…");
+  syncDocRef.set({
+    sessions: state.sessions,
+    feedback: state.feedback,
+    settings: state.settings,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+  }).then(function(){
+    setSyncStatus("đã đồng bộ");
+  }).catch(function(e){
+    console.warn("Đồng bộ lên cloud thất bại:", e);
+    setSyncStatus("lỗi đồng bộ — dữ liệu vẫn lưu trên máy này");
+  });
+}
+
+function startSyncListener(){
+  if(!syncDocRef){
+    setSyncStatus("chưa bật đồng bộ đám mây");
+    return;
+  }
+  syncDocRef.onSnapshot(function(snap){
+    if(snap.exists){
+      syncApplyingRemote = true;
+      var d = snap.data();
+      state.sessions = d.sessions || {};
+      state.feedback = d.feedback || [];
+      state.settings = Object.assign({}, state.settings, d.settings || {});
+      persistLocal();
+      checkDemoBanner();
+      renderAll();
+      syncApplyingRemote = false;
+      setSyncStatus("đã đồng bộ");
+    } else {
+      // Chưa có dữ liệu trên cloud (thiết bị đầu tiên) — đẩy dữ liệu hiện tại lên để khởi tạo
+      syncPush();
+    }
+  }, function(err){
+    console.warn("Kết nối đồng bộ thất bại:", err);
+    setSyncStatus("không kết nối được — vẫn dùng dữ liệu trên máy này");
+  });
+}
+
+/* ================= LOCAL STORAGE PERSISTENCE (lưu ngay trên trình duyệt này — dùng làm bộ nhớ đệm offline) ================= */
 var STORAGE_KEY = "nhip_workout_data_v1";
 var hasDemoData = false;
 
@@ -1483,9 +1560,9 @@ function persistLocal(){
     }));
   }catch(e){ /* private mode / storage blocked — app still works, just won't remember on reload */ }
 }
-function saveSession(sess){ persistLocal(); }
-function saveFeedback(doc){ persistLocal(); }
-function saveSettings(){ persistLocal(); }
+function saveSession(sess){ persistLocal(); syncPush(); }
+function saveFeedback(doc){ persistLocal(); syncPush(); }
+function saveSettings(){ persistLocal(); syncPush(); }
 
 /* Dữ liệu mẫu minh hoạ — chỉ nạp lần đầu mở app (khi chưa có dữ liệu nào trong trình duyệt) */
 var DEMO_SESSIONS = {
@@ -1540,6 +1617,7 @@ document.getElementById("btnClearDemo").addEventListener("click", function(){
   demoIsos.forEach(function(k){ delete state.sessions[k]; });
   state.feedback = state.feedback.filter(function(f){ return !f.demo; });
   persistLocal();
+  syncPush();
   checkDemoBanner();
   renderAll();
 });
@@ -1550,6 +1628,7 @@ renderQuote();
 renderReference();
 renderRateButtons();
 loadFromLocal();
+startSyncListener();
 
 })();
 </script>
