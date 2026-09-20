@@ -218,6 +218,11 @@ main{padding-block:22px 60px; display:flex; flex-direction:column; gap:20px;}
   width:min(480px,100%); max-height:92vh; overflow-y:auto; padding:26px 22px 22px; text-align:center; position:relative;
 }
 .timer-close{position:absolute; top:12px; right:12px;}
+.timer-sound-toggle{position:absolute; top:12px; left:12px;}
+.timer-sound-toggle .icon-off{display:none;}
+.timer-sound-toggle.muted{color:var(--text-faint);}
+.timer-sound-toggle.muted .icon-on{display:none;}
+.timer-sound-toggle.muted .icon-off{display:block;}
 .timer-phase{font-family:var(--font-display); font-size:13px; letter-spacing:.14em; text-transform:uppercase; color:var(--text-muted);}
 .timer-phase.work{color:var(--accent);}
 .timer-phase.rest{color:var(--accent-2);}
@@ -254,6 +259,35 @@ main{padding-block:22px 60px; display:flex; flex-direction:column; gap:20px;}
 .kpi .trend.pos{color:var(--good);}
 .kpi .trend.neg{color:var(--critical);}
 .kpi .trend.flat{color:var(--text-muted);}
+
+/* ============ RECORDS GRID (reuses .kpi tile look) ============ */
+.records-grid{display:grid; grid-template-columns:repeat(1,1fr); gap:10px;}
+@media(min-width:600px){ .records-grid{grid-template-columns:repeat(3,1fr);} }
+
+/* ============ LEVEL / XP ============ */
+.level-panel{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg);
+  padding:16px 18px; margin-bottom:12px; display:flex; flex-direction:column; gap:10px;
+}
+.level-top{display:flex; align-items:baseline; justify-content:space-between; gap:10px; flex-wrap:wrap;}
+.level-name{font-family:var(--font-display); font-size:19px; font-weight:700; display:flex; align-items:center; gap:8px;}
+.level-name svg{width:20px; height:20px; color:var(--accent); flex:none;}
+.level-xp{font-family:var(--font-mono); font-size:12px; color:var(--text-muted); white-space:nowrap;}
+.level-bar-track{height:10px; border-radius:999px; background:var(--surface-2); border:1px solid var(--border); overflow:hidden;}
+.level-bar-fill{height:100%; background:linear-gradient(90deg, var(--accent), var(--accent-2)); border-radius:999px; transition:width .6s cubic-bezier(.22,.9,.3,1);}
+.level-next{font-size:11.5px; color:var(--text-faint);}
+
+/* ============ LEVEL-UP TOAST ============ */
+.level-toast{
+  position:fixed; top:18px; left:50%; transform:translateX(-50%) translateY(-14px); z-index:200;
+  opacity:0; transition:opacity .35s ease, transform .35s ease; pointer-events:none;
+}
+.level-toast.show{opacity:1; transform:translateX(-50%) translateY(0);}
+.level-toast-inner{
+  display:flex; align-items:center; gap:8px; background:var(--accent); color:var(--on-accent);
+  font-weight:700; font-size:13.5px; padding:11px 18px; border-radius:999px; box-shadow:0 10px 30px rgba(0,0,0,.3);
+}
+.level-toast-inner svg{width:17px; height:17px; flex:none;}
 
 /* ============ CHARTS ============ */
 .chart-grid{display:grid; grid-template-columns:1fr; gap:16px;}
@@ -399,6 +433,7 @@ details[open] .ref-chevron{transform:rotate(180deg);}
   <!-- KPI -->
   <section>
     <div class="panel-title" style="margin-bottom:10px;">Tổng quan</div>
+    <div class="level-panel" id="levelPanel"></div>
     <div class="kpi-grid" id="kpiGrid"></div>
   </section>
 
@@ -433,6 +468,12 @@ details[open] .ref-chevron{transform:rotate(180deg);}
         <tbody id="historyBody"></tbody>
       </table>
     </div>
+  </section>
+
+  <!-- PERSONAL RECORDS -->
+  <section class="panel">
+    <div class="panel-head"><span class="panel-title" style="margin:0;">Kỷ lục cá nhân</span></div>
+    <div class="records-grid" id="recordsGrid"></div>
   </section>
 
   <!-- BADGES -->
@@ -537,6 +578,10 @@ details[open] .ref-chevron{transform:rotate(180deg);}
   <div class="timer-card">
     <button class="icon-btn timer-close" id="btnCloseTimer" aria-label="Đóng">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <button class="icon-btn timer-sound-toggle" id="btnToggleSound" aria-label="Bật/tắt âm thanh" title="Bật/tắt âm thanh">
+      <svg class="icon-on" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16.5 8a5 5 0 010 8"/><path d="M19 5.5a9 9 0 010 13"/></svg>
+      <svg class="icon-off" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 9v6h4l5 5V4L8 9H4z"/><path d="M16 9l5 6M21 9l-5 6"/></svg>
     </button>
     <div class="timer-phase" id="timerPhase">KHỞI ĐỘNG</div>
     <div class="timer-ring-wrap">
@@ -926,9 +971,12 @@ function toggleHabit(iso, key){
   sess.habits[key] = !sess.habits[key];
   state.sessions[iso] = sess;
   saveSession(sess);
+  playHabitTickSound(sess.habits[key]);
   renderHero();
   renderKPI();
   renderBadges();
+  renderLevelPanel();
+  renderRecords();
 }
 
 function makeEmptySession(iso){
@@ -966,6 +1014,8 @@ function openTimer(key, stage){
   timer.running = true;
   document.getElementById("timerOverlay").hidden = false;
   document.getElementById("btnTimerPause").textContent = "Tạm dừng";
+  updateSoundToggleUI();
+  playStartSound();
   renderTimerFrame();
   tick();
 }
@@ -997,8 +1047,13 @@ function tick(){
         finishTimerFlow();
         return;
       }
-      beep(timer.plan[timer.idx].type==="work" ? 880 : 440);
+      var nextType = timer.plan[timer.idx].type;
+      if(nextType==="work") playWorkSound();
+      else if(nextType==="rest") playRestSound();
+      else beep(660); // warmup -> work transition or cooldown start
       timer.remaining = timer.plan[timer.idx].secs;
+    } else if(timer.remaining > 0 && timer.remaining <= 3){
+      playCountdownTick();
     }
     renderTimerFrame();
     tick();
@@ -1013,7 +1068,7 @@ function skipStep(){
 function togglePause(){
   timer.running = !timer.running;
   document.getElementById("btnTimerPause").textContent = timer.running ? "Tạm dừng" : "Tiếp tục";
-  if(timer.running) tick(); else clearTimeout(timer.handle);
+  if(timer.running){ playResumeSound(); tick(); } else { playPauseSound(); clearTimeout(timer.handle); }
 }
 function renderTimerFrame(){
   var step = timer.plan[timer.idx];
@@ -1049,20 +1104,95 @@ function renderTimerFrame(){
   bar.setAttribute("stroke-dashoffset", (C*(1-frac)).toFixed(1));
   bar.classList.toggle("rest", step.type==="rest");
 }
-function beep(freq){
+/* ================= SOUND EFFECTS ================= */
+var SOUND_KEY = "nhip_sound_enabled";
+function soundEnabled(){
+  var v = null;
+  try{ v = localStorage.getItem(SOUND_KEY); }catch(e){}
+  return v === null ? true : v === "1";
+}
+function setSoundEnabled(on){
+  try{ localStorage.setItem(SOUND_KEY, on ? "1" : "0"); }catch(e){}
+  updateSoundToggleUI();
+}
+function getAudioCtx(){
   try{
     var Ctx = window.AudioContext || window.webkitAudioContext;
-    if(!Ctx) return;
-    var ctx = beep._ctx || (beep._ctx = new Ctx());
-    var o = ctx.createOscillator(), g = ctx.createGain();
-    o.type = "sine"; o.frequency.value = freq;
-    g.gain.value = 0.001;
-    o.connect(g); g.connect(ctx.destination);
+    if(!Ctx) return null;
+    return getAudioCtx._ctx || (getAudioCtx._ctx = new Ctx());
+  }catch(e){ return null; }
+}
+function tone(ctx, freq, startT, dur, type, peakGain){
+  var o = ctx.createOscillator(), g = ctx.createGain();
+  o.type = type || "sine";
+  o.frequency.value = freq;
+  g.gain.value = 0.0001;
+  o.connect(g); g.connect(ctx.destination);
+  g.gain.exponentialRampToValueAtTime(peakGain || 0.18, startT+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001, startT+dur);
+  o.start(startT); o.stop(startT+dur+0.03);
+}
+function playChime(seq){
+  if(!soundEnabled()) return;
+  var ctx = getAudioCtx();
+  if(!ctx) return;
+  try{
     var t0 = ctx.currentTime;
-    g.gain.exponentialRampToValueAtTime(0.18, t0+0.02);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0+0.28);
-    o.start(t0); o.stop(t0+0.3);
+    seq.forEach(function(n){ tone(ctx, n.freq, t0+n.delay, n.dur||0.22, n.type, n.gain); });
   }catch(e){}
+}
+function beep(freq){
+  if(!soundEnabled()) return;
+  var ctx = getAudioCtx();
+  if(!ctx) return;
+  try{ tone(ctx, freq, ctx.currentTime, 0.28); }catch(e){}
+}
+function vibrate(pattern){
+  if(!soundEnabled()) return;
+  try{ if(navigator.vibrate) navigator.vibrate(pattern); }catch(e){}
+}
+function playStartSound(){
+  playChime([{freq:523,delay:0,dur:.14},{freq:659,delay:.11,dur:.14},{freq:784,delay:.22,dur:.3,gain:.16}]);
+  vibrate([30]);
+}
+function playWorkSound(){ beep(880); vibrate([25]); }
+function playRestSound(){ beep(440); }
+function playCountdownTick(){
+  if(!soundEnabled()) return;
+  var ctx = getAudioCtx();
+  if(!ctx) return;
+  try{ tone(ctx, 1180, ctx.currentTime, 0.05, "square", 0.06); }catch(e){}
+}
+function playPauseSound(){ beep(300); }
+function playResumeSound(){ beep(600); }
+function playHabitTickSound(on){
+  if(!soundEnabled()) return;
+  var ctx = getAudioCtx();
+  if(!ctx) return;
+  try{ tone(ctx, on?920:360, ctx.currentTime, 0.09, "sine", 0.1); }catch(e){}
+}
+function playSessionCompleteFanfare(){
+  playChime([
+    {freq:523,delay:0,dur:.16,gain:.17},
+    {freq:659,delay:.13,dur:.16,gain:.17},
+    {freq:784,delay:.26,dur:.18,gain:.18},
+    {freq:1046,delay:.4,dur:.55,gain:.22}
+  ]);
+  vibrate([50,40,50,40,140]);
+}
+function playLevelUpFanfare(){
+  playChime([
+    {freq:659,delay:0,dur:.13,gain:.16},
+    {freq:784,delay:.11,dur:.13,gain:.16},
+    {freq:988,delay:.22,dur:.13,gain:.17},
+    {freq:1318,delay:.33,dur:.6,gain:.24}
+  ]);
+  vibrate([40,30,40,30,40,30,160]);
+}
+function updateSoundToggleUI(){
+  var btn = document.getElementById("btnToggleSound");
+  if(!btn) return;
+  btn.classList.toggle("muted", !soundEnabled());
 }
 function finishTimerFlow(){
   closeTimer();
@@ -1085,6 +1215,7 @@ function promptFinishSession(key, defaultDuration){
   sess.demo = false;
   state.sessions[TODAY_ISO] = sess;
   saveSession(sess);
+  playSessionCompleteFanfare();
   renderAll();
 }
 
@@ -1160,6 +1291,160 @@ function renderKPI(){
       (c.trend? '<span class="trend '+c.trend+'">'+(c.trend==="pos"?"↓ đang giảm":c.trend==="neg"?"↑ đang tăng":"không đổi")+'</span>':'')+
     '</div>';
   }).join("");
+}
+
+/* ================= PERSONAL RECORDS (all-time, derived — never stored directly) ================= */
+function bestStreakEver(){
+  var isos = Object.keys(state.sessions).filter(function(iso){
+    return dayKeyFor(parseISO(iso))!==null;
+  }).sort();
+  var max=0, run=0, prevD=null;
+  isos.forEach(function(iso){
+    var s = state.sessions[iso];
+    var d = parseISO(iso);
+    if(s && s.completed){
+      if(prevD){
+        var expected = addDays(d,-1);
+        while(dayKeyFor(expected)===null){ expected = addDays(expected,-1); }
+        run = (isoDate(expected)===isoDate(prevD)) ? run+1 : 1;
+      } else { run = 1; }
+      prevD = d;
+      if(run>max) max = run;
+    }
+  });
+  return Math.max(max, computeStreak());
+}
+function allWeeksAdherenceData(){
+  var weeks=[];
+  var mondayThis = addDays(today, -((dowIndex(today)+6)%7));
+  var startD = parseISO(state.settings.startDate || TODAY_ISO);
+  var mon = addDays(startD, -((dowIndex(startD)+6)%7));
+  var guard = 0;
+  while(mon<=mondayThis && guard<520){
+    guard++;
+    var planned=0, done=0;
+    for(var i=0;i<5;i++){
+      var d = addDays(mon,i);
+      if(d>today || d<startD) continue;
+      planned++;
+      var sess = state.sessions[isoDate(d)];
+      if(sess && sess.completed) done++;
+    }
+    if(planned>0) weeks.push({planned:planned, done:done, pct:Math.round(100*done/planned)});
+    mon = addDays(mon,7);
+  }
+  return weeks;
+}
+function bestWeeklyAdherenceEver(){
+  var weeks = allWeeksAdherenceData();
+  if(weeks.length===0) return null;
+  return Math.max.apply(null, weeks.map(function(w){ return w.pct; }));
+}
+function renderRecords(){
+  var box = document.getElementById("recordsGrid");
+  if(!box) return;
+  var bestStreak = bestStreakEver();
+  var bestAdh = bestWeeklyAdherenceEver();
+  var total = totalCompleted();
+  var cards = [
+    {l:"Chuỗi dài nhất từng đạt", v:bestStreak, unit:"buổi"},
+    {l:"Tuân thủ tuần cao nhất", v: bestAdh==null?"—":bestAdh, unit: bestAdh==null?"":"%"},
+    {l:"Tổng số buổi đã tập", v: total, unit:"buổi"}
+  ];
+  box.innerHTML = cards.map(function(c){
+    return '<div class="kpi"><span class="l">'+c.l+'</span>'+
+      '<span class="v tnum">'+c.v+(c.unit?'<small>'+c.unit+'</small>':'')+'</span></div>';
+  }).join("");
+}
+
+/* ================= XP & LEVEL SYSTEM (derived from session history, never stored as a counter) ================= */
+var LEVELS = [
+  {n:"Người mới", xp:0},
+  {n:"Chăm chỉ", xp:120},
+  {n:"Kiên trì", xp:300},
+  {n:"Đều đặn", xp:550},
+  {n:"Bền bỉ", xp:900},
+  {n:"Kỷ luật thép", xp:1400},
+  {n:"Chiến binh Nhịp", xp:2100},
+  {n:"Huyền thoại Nhịp", xp:3000}
+];
+function computeXP(){
+  var xp = 0;
+  Object.keys(state.sessions).forEach(function(iso){
+    var s = state.sessions[iso];
+    if(!s) return;
+    var isWeekend = dayKeyFor(parseISO(iso))===null;
+    var habits = s.habits || {};
+    var habitCount = HABITS_DEF.filter(function(h){ return habits[h.k]; }).length;
+    if(s.completed){
+      xp += 20; // base cho mỗi buổi hoàn thành
+      xp += habitCount*2; // điểm thưởng theo từng thói quen bổ trợ đã tick
+      if(habitCount===HABITS_DEF.length) xp += 8; // thưởng thêm nếu tick đủ tất cả thói quen
+    } else if(isWeekend && habitCount>0){
+      xp += 4 + (habitCount-1); // thưởng nhỏ cho vận động/thói quen cuối tuần dù không có buổi HIIT chính thức
+    }
+  });
+  xp += Math.floor(bestStreakEver()/5)*15; // thưởng mốc chuỗi cao nhất từng đạt (không giảm theo thời gian)
+  return xp;
+}
+function computeLevelInfo(xp){
+  var idx = 0;
+  for(var i=0;i<LEVELS.length;i++){ if(xp>=LEVELS[i].xp) idx=i; }
+  var cur = LEVELS[idx], next = LEVELS[idx+1] || null;
+  var pct = next ? Math.max(0,Math.min(100, Math.round(100*(xp-cur.xp)/(next.xp-cur.xp)))) : 100;
+  return {
+    level: idx+1, name: cur.n, xp: xp,
+    nextName: next?next.n:null, nextThreshold: next?next.xp:null,
+    pct: pct, maxed: !next
+  };
+}
+var LEVEL_SEEN_KEY = "nhip_last_level_seen";
+var levelTrackingReady = false; // tránh báo "lên cấp" giả khi state còn rỗng lúc chưa tải xong dữ liệu
+function checkLevelUp(curLevel){
+  if(!levelTrackingReady) return;
+  var seen = null;
+  try{ seen = localStorage.getItem(LEVEL_SEEN_KEY); }catch(e){}
+  seen = seen ? Number(seen) : null;
+  if(seen===null){
+    try{ localStorage.setItem(LEVEL_SEEN_KEY, String(curLevel)); }catch(e){}
+    return;
+  }
+  if(curLevel > seen){
+    try{ localStorage.setItem(LEVEL_SEEN_KEY, String(curLevel)); }catch(e){}
+    playLevelUpFanfare();
+    showLevelUpToast(curLevel);
+  }
+}
+function showLevelUpToast(level){
+  var info = LEVELS[level-1];
+  if(!info) return;
+  var t = document.createElement("div");
+  t.className = "level-toast";
+  t.innerHTML = '<div class="level-toast-inner">'+
+    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.5 6.5L21 10l-5 4.5L17.5 21 12 17l-5.5 4L8 14.5 3 10l6.5-1.5z"/></svg>'+
+    'Lên cấp '+level+' — '+info.n+'!</div>';
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.classList.add("show"); });
+  setTimeout(function(){
+    t.classList.remove("show");
+    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 400);
+  }, 3200);
+}
+function renderLevelPanel(){
+  var box = document.getElementById("levelPanel");
+  if(!box) return;
+  var info = computeLevelInfo(computeXP());
+  box.innerHTML =
+    '<div class="level-top">'+
+      '<span class="level-name">'+
+        '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l2.5 6.5L21 10l-5 4.5L17.5 21 12 17l-5.5 4L8 14.5 3 10l6.5-1.5z"/></svg>'+
+        'Cấp '+info.level+' — '+info.name+
+      '</span>'+
+      '<span class="level-xp tnum">'+info.xp+' XP'+(info.maxed?'':' · còn '+(info.nextThreshold-info.xp)+' XP để lên "'+info.nextName+'"')+'</span>'+
+    '</div>'+
+    '<div class="level-bar-track"><div class="level-bar-fill" style="width:'+info.pct+'%"></div></div>'+
+    (info.maxed ? '<div class="level-next">Đã đạt cấp cao nhất — một hành trình bền bỉ thật sự!</div>' : '');
+  checkLevelUp(info.level);
 }
 
 /* ================= CHARTS (inline SVG, per dataviz spec) ================= */
@@ -1466,6 +1751,8 @@ document.getElementById("btnSaveSettings").addEventListener("click", function(){
 document.getElementById("btnCloseTimer").addEventListener("click", closeTimer);
 document.getElementById("btnTimerSkip").addEventListener("click", skipStep);
 document.getElementById("btnTimerPause").addEventListener("click", togglePause);
+document.getElementById("btnToggleSound").addEventListener("click", function(){ setSoundEnabled(!soundEnabled()); });
+updateSoundToggleUI();
 document.getElementById("timerVideoRetry").addEventListener("click", function(){
   var vw = document.getElementById("timerVideoWrap");
   var id = vw.getAttribute("data-cur");
@@ -1480,6 +1767,8 @@ function renderAll(){
   renderHero();
   renderWeekStrip();
   renderKPI();
+  renderLevelPanel();
+  renderRecords();
   renderWeightChart();
   renderAdherenceChart();
   renderHistory();
@@ -1609,6 +1898,7 @@ function loadFromLocal(){
     seedDemoData();
   }
   checkDemoBanner();
+  levelTrackingReady = true;
   renderAll();
 }
 
