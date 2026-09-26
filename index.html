@@ -26,6 +26,7 @@ img{max-width:100%;}
   --text:#F2EAE1; --text-muted:#AFA093; --text-faint:#7A6C60;
   --accent:#E8622A; --accent-soft:#3A2618; --on-accent:#1A1210;
   --accent-2:#2FA39D; --accent-2-soft:#17302E;
+  --accent-3:#9B72CE; --accent-3-soft:#241B33;
   --good:#2F9E6E; --good-soft:#16302A;
   --warning:#B8841A; --warning-soft:#332711;
   --critical:#D1435C; --critical-soft:#331A20;
@@ -42,6 +43,7 @@ img{max-width:100%;}
     --text:#2A2118; --text-muted:#6E6053; --text-faint:#9C8E7E;
     --accent:#C6531B; --accent-soft:#F6E3D4; --on-accent:#FFF8F2;
     --accent-2:#00897B; --accent-2-soft:#DCEEEB;
+    --accent-3:#7C4DBC; --accent-3-soft:#EFE6F8;
     --good:#00785A; --good-soft:#DCEEE6;
     --warning:#8C5A0A; --warning-soft:#F5E6CB;
     --critical:#B81452; --critical-soft:#F6DCE4;
@@ -54,6 +56,7 @@ img{max-width:100%;}
   --text:#2A2118; --text-muted:#6E6053; --text-faint:#9C8E7E;
   --accent:#C6531B; --accent-soft:#F6E3D4; --on-accent:#FFF8F2;
   --accent-2:#00897B; --accent-2-soft:#DCEEEB;
+  --accent-3:#7C4DBC; --accent-3-soft:#EFE6F8;
   --good:#00785A; --good-soft:#DCEEE6;
   --warning:#8C5A0A; --warning-soft:#F5E6CB;
   --critical:#B81452; --critical-soft:#F6DCE4;
@@ -258,6 +261,7 @@ main{padding-block:22px 60px; display:flex; flex-direction:column; gap:20px;}
 .kpi .trend.pos{color:var(--good);}
 .kpi .trend.neg{color:var(--critical);}
 .kpi .trend.flat{color:var(--text-muted);}
+.kpi.warn .v{color:var(--warning);}
 
 /* ============ RECORDS GRID (reuses .kpi tile look) ============ */
 .records-grid{display:grid; grid-template-columns:repeat(1,1fr); gap:10px;}
@@ -387,6 +391,10 @@ details[open] .ref-chevron{transform:rotate(180deg);}
   background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text);
   padding:9px 12px; font-family:var(--font-mono); font-size:14px; width:100%;
 }
+.field select{
+  background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius); color:var(--text);
+  padding:9px 12px; font-family:var(--font-body); font-size:14px; width:100%;
+}
 .settings-row{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
 .footer-note{text-align:center; color:var(--text-faint); font-size:11.5px; padding-block:10px 30px;}
 </style>
@@ -452,6 +460,22 @@ details[open] .ref-chevron{transform:rotate(180deg);}
       </div>
       <div class="chart-box" id="adherenceChartBox"></div>
     </div>
+    <div class="panel">
+      <div class="panel-head">
+        <span class="eyebrow">Năng lượng</span>
+        <span class="panel-title" style="margin:0;">Calo đốt theo buổi tập</span>
+      </div>
+      <div class="chart-box" id="calorieChartBox"></div>
+    </div>
+  </section>
+
+  <!-- NUTRITION -->
+  <section class="panel">
+    <div class="panel-head">
+      <span class="eyebrow">Dinh dưỡng</span>
+      <span class="panel-title" style="margin:0;">Calo &amp; gợi ý khẩu phần hằng ngày</span>
+    </div>
+    <div id="nutritionBody"></div>
   </section>
 
   <!-- HISTORY -->
@@ -559,6 +583,34 @@ details[open] .ref-chevron{transform:rotate(180deg);}
     <div class="field">
       <label>Tuần đang tập (tự tăng dần mức độ khó)</label>
       <input type="number" step="1" min="1" id="setWeek">
+    </div>
+    <div class="settings-row">
+      <div class="field">
+        <label>Tuổi</label>
+        <input type="number" step="1" min="1" id="setAge">
+      </div>
+      <div class="field">
+        <label>Chiều cao (cm)</label>
+        <input type="number" step="1" min="1" id="setHeight">
+      </div>
+    </div>
+    <div class="settings-row">
+      <div class="field">
+        <label>Giới tính (để tính BMR)</label>
+        <select id="setSex">
+          <option value="male">Nam</option>
+          <option value="female">Nữ</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Vận động ngoài giờ tập</label>
+        <select id="setActivity">
+          <option value="sedentary">Ít vận động</option>
+          <option value="light">Vận động nhẹ</option>
+          <option value="moderate">Vận động vừa</option>
+          <option value="active">Vận động nhiều</option>
+        </select>
+      </div>
     </div>
     <div style="display:flex; gap:10px; justify-content:flex-end; margin-top:6px;">
       <button class="btn btn-secondary" id="btnCancelSettings" type="button">Huỷ</button>
@@ -723,6 +775,79 @@ function getExercises(key, week){
   if(week>=ADVANCED_FROM_WEEK && d.exercisesAdvanced) return d.exercisesAdvanced;
   return d.exercises;
 }
+
+/* ================= CALORIES (ước tính MET từ khối lượng buổi tập được thiết kế) ================= */
+var MET_TABLE = {
+  "Push-up (chống đẩy)":8.0, "Push-up":8.0,
+  "Squat":5.0,
+  "Pike push-up (chống đẩy hình chữ V)":8.0,
+  "Mountain climber":8.0,
+  "Plank shoulder tap":4.0,
+  "Plank up-down":4.5,
+  "Jumping jack":8.0,
+  "Jump squat (squat bật nhảy)":8.0,
+  "Lunge xen kẽ (alternating lunge)":5.0, "Lunge xen kẽ":5.0,
+  "Glute bridge (cầu mông)":3.5,
+  "Single-leg deadlift (một chân)":3.5,
+  "Calf raise (nhón gót)":3.0,
+  "Wall sit hoặc Jump squat":5.0,
+  "Jump lunge (lunge bật nhảy đổi chân)":8.0, "Jump lunge":8.0,
+  "Bulgarian split squat (mỗi chân)":6.0,
+  "Superman":3.0, "Superman hoặc Y-T-W raise":3.0,
+  "Reverse snow angel / Y-T-W raise":3.0,
+  "Bird-dog":3.0,
+  "Glute bridge march":3.5,
+  "Plank":4.0,
+  "Side plank (đổi bên giữa 2 vòng)":4.0, "Side plank (đổi bên)":4.0,
+  "Burpee (bỏ chống đẩy nếu mới tập)":8.0,
+  "Burpee đầy đủ (có chống đẩy)":10.0,
+  "Burpee (bài kết)":9.0,
+  "High knees (chạy nâng cao gối)":8.0,
+  "Butt kicks (gót chạm mông)":8.0,
+  "Squat jump (hoặc squat thường)":7.0,
+  "Plank walk-up":5.0,
+  "Star jump":8.0,
+  "Plank jack":6.0
+};
+var MET_WARMUP = 3.5, MET_REST = 2.3, MET_COOLDOWN = 2.3, MET_DEFAULT = 5.0;
+function metFor(name){ return MET_TABLE[name] || MET_DEFAULT; }
+function sessionCaloriesFor(key, week, weightKg){
+  var ex = getExercises(key, week);
+  if(!ex || !ex.length || !weightKg) return 0;
+  var stage = getStage(week);
+  var kcal = MET_WARMUP*weightKg*(120/3600) + MET_COOLDOWN*weightKg*(120/3600);
+  var totalOcc = stage.rounds*ex.length;
+  for(var r=0; r<stage.rounds; r++){
+    for(var i=0; i<ex.length; i++){ kcal += metFor(ex[i].n)*weightKg*(stage.work/3600); }
+  }
+  kcal += MET_REST*weightKg*(stage.rest/3600)*(totalOcc-1);
+  return Math.round(kcal);
+}
+function currentBodyWeightKg(){
+  var pts = allWeightPoints();
+  return pts.length ? pts[pts.length-1].kg : state.settings.startWeightKg;
+}
+function sessionCalories(sess){
+  if(!sess || !sess.completed) return 0;
+  if(sess.caloriesBurned!=null) return sess.caloriesBurned;
+  if(!sess.dayKey) return 0;
+  return sessionCaloriesFor(sess.dayKey, state.settings.currentWeek, sess.weightKg || currentBodyWeightKg());
+}
+var ACTIVITY_LEVELS = [
+  {k:"sedentary", l:"Ít vận động", mult:1.2},
+  {k:"light", l:"Vận động nhẹ", mult:1.375},
+  {k:"moderate", l:"Vận động vừa", mult:1.55},
+  {k:"active", l:"Vận động nhiều", mult:1.725}
+];
+function activityMultiplier(k){
+  var found = ACTIVITY_LEVELS.filter(function(a){ return a.k===k; })[0];
+  return found ? found.mult : 1.375;
+}
+function computeBMR(weightKg, heightCm, age, sex){
+  var base = 10*weightKg + 6.25*heightCm - 5*age;
+  return sex==="female" ? base-161 : base+5;
+}
+
 var HABITS_DEF = [
   {k:"protein", l:"Đủ đạm"},
   {k:"sleep", l:"Ngủ 7-8h"},
@@ -822,7 +947,7 @@ function estDuration(stage){
 var today = new Date();
 var TODAY_ISO = isoDate(today);
 var state = {
-  settings:{ startWeightKg:95, targetWeightKg:80, startDate:TODAY_ISO, currentWeek:1 },
+  settings:{ startWeightKg:95, targetWeightKg:80, startDate:TODAY_ISO, currentWeek:1, age:null, heightCm:null, sex:"male", activityLevel:"light" },
   sessions:{},      // iso -> doc
   feedback:[],      // array of docs
   fbRating:null
@@ -1254,9 +1379,11 @@ function promptFinishSession(key, defaultDuration){
   sess.rpe = rpeStr ? Number(rpeStr) : null;
   if(weightStr){ sess.weightKg = Number(weightStr); }
   sess.demo = false;
+  sess.caloriesBurned = sessionCaloriesFor(key, state.settings.currentWeek, sess.weightKg || currentBodyWeightKg());
   state.sessions[TODAY_ISO] = sess;
   saveSession(sess);
   playSessionCompleteFanfare();
+  showInfoToast('<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-1 4.5-2.5 6C7.8 9.8 7 11.5 7 13.5 7 17.6 9.7 20 12 20s5-2.2 5-6c0-2-.9-3.2-1.7-4.3.3 1.6-.4 2.6-1.1 2.6-.9 0-1.2-.9-.9-1.8.6-1.8.2-4.8-1.3-8.5z"/></svg>Đã đốt ~'+sess.caloriesBurned+' kcal buổi này!');
   renderAll();
 }
 
@@ -1311,6 +1438,11 @@ function totalCompleted(){
   Object.keys(state.sessions).forEach(function(k){ if(state.sessions[k].completed) n++; });
   return n;
 }
+function totalCaloriesBurned(){
+  var total=0;
+  Object.keys(state.sessions).forEach(function(k){ var s=state.sessions[k]; if(s.completed) total += sessionCalories(s); });
+  return total;
+}
 function renderKPI(){
   var streak = computeStreak();
   document.getElementById("streakVal").textContent = streak;
@@ -1318,13 +1450,15 @@ function renderKPI(){
   var wpts = allWeightPoints();
   var wChange = wpts.length>=1 ? (wpts[wpts.length-1].kg - state.settings.startWeightKg) : null;
   var total = totalCompleted();
+  var totalKcal = totalCaloriesBurned();
 
   var cards = [
     {l:"Chuỗi hiện tại", v:streak, unit:"buổi", trend:null},
     {l:"Tuân thủ 7 ngày", v: adh==null?"—":adh, unit: adh==null?"":"%", trend:null},
     {l:"Thay đổi cân nặng", v: wChange==null? "—" : (wChange>0?"+":"")+fmtKg(wChange), unit: wChange==null?"":"kg",
       trend: wChange==null?null:(wChange<0?"pos":wChange>0?"neg":"flat")},
-    {l:"Tổng số buổi", v: total, unit:"buổi", trend:null}
+    {l:"Tổng số buổi", v: total, unit:"buổi", trend:null},
+    {l:"Tổng calo đã đốt", v: totalKcal, unit:"kcal", trend:null}
   ];
   document.getElementById("kpiGrid").innerHTML = cards.map(function(c){
     return '<div class="kpi"><span class="l">'+c.l+'</span>'+
@@ -1464,6 +1598,17 @@ function showLevelUpToast(level){
   t.innerHTML = '<div class="level-toast-inner">'+
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l2.5 6.5L21 10l-5 4.5L17.5 21 12 17l-5.5 4L8 14.5 3 10l6.5-1.5z"/></svg>'+
     'Lên cấp '+level+' — '+info.n+'!</div>';
+  document.body.appendChild(t);
+  requestAnimationFrame(function(){ t.classList.add("show"); });
+  setTimeout(function(){
+    t.classList.remove("show");
+    setTimeout(function(){ if(t.parentNode) t.parentNode.removeChild(t); }, 400);
+  }, 3200);
+}
+function showInfoToast(html){
+  var t = document.createElement("div");
+  t.className = "level-toast";
+  t.innerHTML = '<div class="level-toast-inner">'+html+'</div>';
   document.body.appendChild(t);
   requestAnimationFrame(function(){ t.classList.add("show"); });
   setTimeout(function(){
@@ -1631,6 +1776,117 @@ function renderAdherenceChart(){
   });
 }
 
+function dailyCalorieData(){
+  var isos = Object.keys(state.sessions).filter(function(iso){
+    var s = state.sessions[iso];
+    return s && s.completed;
+  }).sort();
+  return isos.slice(-12).map(function(iso){
+    return {date:iso, kcal: sessionCalories(state.sessions[iso])};
+  });
+}
+function renderCalorieChart(){
+  var box = document.getElementById("calorieChartBox");
+  var pts = dailyCalorieData();
+  if(pts.length===0){
+    box.innerHTML = '<div class="chart-empty">Chưa có buổi tập nào hoàn thành để tính calo.</div>';
+    return;
+  }
+  var W=520,H=260,padL=40,padR=16,padT=16,padB=30;
+  var accent3 = cssVar("--accent-3") || "#9B72CE";
+  var textc = cssVar("--text-muted") || "#AFA093";
+  var border = cssVar("--border") || "#3D342C";
+  var n = pts.length;
+  var gap = 8;
+  var bw = (W-padL-padR-gap*(n-1))/n;
+  var maxK = Math.max.apply(null, pts.map(function(p){return p.kcal;})) || 1;
+  var top = Math.max(50, Math.ceil(maxK*1.15/50)*50);
+  function y(v){ return padT + (1-v/top)*(H-padT-padB); }
+
+  var svg = svgEl("svg",{viewBox:"0 0 "+W+" "+H,"aria-label":"Biểu đồ calo đốt theo buổi tập"});
+  [0, Math.round(top/2), top].forEach(function(v){
+    var gy=y(v);
+    svg.appendChild(svgEl("line",{x1:padL,x2:W-padR,y1:gy,y2:gy,stroke:border,"stroke-width":1}));
+    var t = svgEl("text",{x:4,y:gy+4,"font-size":10,fill:textc});
+    t.textContent=v; svg.appendChild(t);
+  });
+  var barGroup = svgEl("g",{});
+  pts.forEach(function(p,i){
+    var bx = padL + i*(bw+gap);
+    var by = y(p.kcal);
+    var bh = (H-padB)-by;
+    var rect = svgEl("rect",{x:bx,y:by,width:bw,height:Math.max(bh,1),fill:accent3,rx:3,"data-i":i});
+    barGroup.appendChild(rect);
+    if(i===0 || i===pts.length-1 || n<=6){
+      var lbl = svgEl("text",{x:bx+bw/2,y:H-8,"font-size":10,fill:textc,"text-anchor":"middle"});
+      lbl.textContent = shortDate(parseISO(p.date)); svg.appendChild(lbl);
+    }
+    if(i===pts.length-1){
+      var vlabel = svgEl("text",{x:bx+bw/2,y:by-6,"font-size":11,"font-weight":700,fill:accent3,"text-anchor":"middle","font-family":"'JetBrains Mono',monospace"});
+      vlabel.textContent = p.kcal+" kcal"; svg.appendChild(vlabel);
+    }
+  });
+  svg.appendChild(barGroup);
+  box.innerHTML="";
+  box.appendChild(svg);
+  attachTooltip(box, svg, barGroup, function(el){
+    var i=+el.getAttribute("data-i"); var p=pts[i];
+    return shortDate(parseISO(p.date))+" — <b>"+p.kcal+" kcal</b>";
+  });
+}
+
+/* ================= NUTRITION (BMR/TDEE ước tính) ================= */
+function renderNutrition(){
+  var box = document.getElementById("nutritionBody");
+  if(!box) return;
+  var s = state.settings;
+  if(!s.age || !s.heightCm){
+    box.innerHTML = '<div class="chart-empty">Nhập tuổi và chiều cao trong Cài đặt để xem BMR, TDEE và gợi ý mức calo nạp mỗi ngày.</div>';
+    return;
+  }
+  var weight = currentBodyWeightKg();
+  var bmr = Math.round(computeBMR(weight, s.heightCm, s.age, s.sex));
+  var tdee = Math.round(bmr*activityMultiplier(s.activityLevel));
+  var todaySess = state.sessions[TODAY_ISO];
+  var dow = dowIndex(today);
+  var isWeekday = dow>=1 && dow<=5;
+  var burnedToday, burnedLabel;
+  if(todaySess && todaySess.completed){
+    burnedToday = sessionCalories(todaySess);
+    burnedLabel = "Calo đốt hôm nay";
+  } else if(isWeekday){
+    burnedToday = sessionCaloriesFor(dayKeyFor(today), s.currentWeek, weight);
+    burnedLabel = "Dự kiến nếu tập hôm nay";
+  } else {
+    burnedToday = 0;
+    burnedLabel = "Calo đốt hôm nay (cuối tuần)";
+  }
+  var tdeeToday = tdee + burnedToday;
+  var floor = s.sex==="female" ? 1200 : 1500;
+  var tiers = [
+    {l:"Giảm nhẹ · ~0,25kg/tuần", deficit:275},
+    {l:"Giảm vừa · ~0,5kg/tuần (khuyến nghị)", deficit:550},
+    {l:"Giảm nhanh · ~0,75kg/tuần", deficit:825}
+  ];
+  var tierCards = tiers.map(function(t){
+    var intake = Math.round(tdeeToday - t.deficit);
+    var warn = intake < floor;
+    return '<div class="kpi'+(warn?' warn':'')+'"><span class="l">'+t.l+'</span>'+
+      '<span class="v tnum">'+intake+'<small>kcal</small></span>'+
+      (warn?'<span class="trend neg">Dưới mức tối thiểu khuyến nghị</span>':'')+
+    '</div>';
+  }).join("");
+  box.innerHTML =
+    '<div class="kpi-grid">'+
+      '<div class="kpi"><span class="l">BMR</span><span class="v tnum">'+bmr+'<small>kcal</small></span></div>'+
+      '<div class="kpi"><span class="l">TDEE (ngày nghỉ)</span><span class="v tnum">'+tdee+'<small>kcal</small></span></div>'+
+      '<div class="kpi"><span class="l">'+burnedLabel+'</span><span class="v tnum">'+burnedToday+'<small>kcal</small></span></div>'+
+      '<div class="kpi"><span class="l">TDEE hôm nay</span><span class="v tnum">'+tdeeToday+'<small>kcal</small></span></div>'+
+    '</div>'+
+    '<div class="kpi-grid" style="margin-top:10px;">'+tierCards+'</div>'+
+    '<p class="pace-note">Ước tính theo công thức Mifflin-St Jeor (BMR) + hệ số vận động (TDEE), cộng thêm calo đốt từ buổi tập được thiết kế hôm nay. Chỉ mang tính tham khảo — không thay thế tư vấn y tế/dinh dưỡng, đặc biệt với mục tiêu giảm cân nhanh như hiện tại.</p>';
+}
+
 function attachTooltip(box, svg, group, textFn){
   var tip = document.createElement("div");
   tip.className="tooltip";
@@ -1774,6 +2030,10 @@ function openSettings(){
   document.getElementById("setTargetW").value = state.settings.targetWeightKg;
   document.getElementById("setStartDate").value = state.settings.startDate;
   document.getElementById("setWeek").value = state.settings.currentWeek;
+  document.getElementById("setAge").value = state.settings.age || "";
+  document.getElementById("setHeight").value = state.settings.heightCm || "";
+  document.getElementById("setSex").value = state.settings.sex || "male";
+  document.getElementById("setActivity").value = state.settings.activityLevel || "light";
   document.getElementById("settingsOverlay").hidden = false;
 }
 document.getElementById("btnSettings").addEventListener("click", openSettings);
@@ -1783,6 +2043,10 @@ document.getElementById("btnSaveSettings").addEventListener("click", function(){
   state.settings.targetWeightKg = Number(document.getElementById("setTargetW").value)||state.settings.targetWeightKg;
   state.settings.startDate = document.getElementById("setStartDate").value || state.settings.startDate;
   state.settings.currentWeek = Number(document.getElementById("setWeek").value)||state.settings.currentWeek;
+  state.settings.age = Number(document.getElementById("setAge").value)||state.settings.age;
+  state.settings.heightCm = Number(document.getElementById("setHeight").value)||state.settings.heightCm;
+  state.settings.sex = document.getElementById("setSex").value || state.settings.sex;
+  state.settings.activityLevel = document.getElementById("setActivity").value || state.settings.activityLevel;
   saveSettings();
   document.getElementById("settingsOverlay").hidden = true;
   renderAll();
@@ -1812,6 +2076,8 @@ function renderAll(){
   renderRecords();
   renderWeightChart();
   renderAdherenceChart();
+  renderCalorieChart();
+  renderNutrition();
   renderHistory();
   renderBadges();
   renderFeedbackHistory();
